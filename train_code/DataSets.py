@@ -6,115 +6,197 @@ from SourceManager import SourceManager
 import torch
 import random
 from threading import Lock as TLock
+import time
 
 
 class DataSets:
     def __init__(self, params: Params) -> None:
-        # 参数
-        self.params = params
+        self.dataset_size = params.dataset_size
+        self.batch_size = params.batch_size
+        self.is_cuda = params.is_cuda
+
         # 域管理类初始化
-        self.sourceManager = SourceManager(params.domainWidth,params.domainHeight,params.whRate,
-            params.boundaryRate,params.pointNumber,params.minT,params.maxT,params.minBiasRate,params.maxBiasRate)
-        self.domainManager = DomainManager(params.domainWidth,params.domainHeight,self.sourceManager)
+        self.sourceManager = SourceManager(
+            params.domainWidth,
+            params.domainHeight,
+            params.whRate,
+            params.boundaryRate,
+            params.pointNumber,
+            params.minT,
+            params.maxT,
+            params.minBiasRate,
+            params.maxBiasRate,
+        )
+        self.domainManager = DomainManager(
+            params.domainWidth, params.domainHeight, self.sourceManager
+        )
+
         # 计算域数据初始化
         self.domainList = self.getDomainList(params.dataset_size)
         self.domainSize = params.dataset_size
-        # 读缓存
-        self.cachePList = torch.zeros(params.cacheSize,1,params.domainWidth,params.domainHeight)
-        self.cacheVList = torch.zeros(params.cacheSize,2,params.domainWidth,params.domainHeight)
-        self.cachePropagationList = torch.zeros(params.cacheSize,1,params.domainWidth,params.domainHeight)
-        self.cacheIndexList = [[-1 for _ in range(params.batch_size)] for _ in range(params.cacheSize)]
-        self.cacheNextInsertIndex:int = -1
-        self.cacheHasInsertIndex:int = -1
-        self.cacheHasReadIndex:int = -1
-        self.cacheHasWriteIndex:int = -1
-        self.cacheLock = TLock()
+        self.readIndex = 0
+        self.writeCount = 0
+        self.rLock = TLock()
 
+    """获取单个计算域配置"""
 
-    '''获取单个计算域配置'''
-    def getDomainList(self,domainSize:int) -> List[Domain]:
+    def getDomainList(self, domainSize: int) -> List[Domain]:
         domainList = []
         for index in range(domainSize):
             domain = self.domainManager.getRandomDomain(index)
             domainList.append(domain)
         return domainList
 
-    '''索引获取'''
-    def askDomainByIndex(self,index:int):
+    """索引获取"""
+
+    def askDomainByIndex(self, index: int) -> tuple:
         if index > self.domainSize:
             raise RuntimeError
         domain = self.domainList[index]
-        domain.sourceUpdate()
-        return domain.data_p,domain.data_v,domain.data_propagation
+        domain.update()
+        return domain
 
-    '''刷新缓存'''
-    def freshCacheByIndexList(self,cacheIndex:int,indexList:List[int])->bool:
-        if len(indexList) != self.params.batch_size:
-            raise RuntimeError
+    def askDomainListByIndexList(self, indexList: List[int]) -> List[Domain]:
+        return [self.askDomainByIndex(index) for index in indexList]
+    
+    """同步批量读"""
+    def ask(self):
+        while True:
+            data = self.ansycAsk()
+            if data == ():
+                time.sleep(0.1)
+            else:
+                return data
 
-        cacheP = self.cachePList[cacheIndex]
-        cacheV = self.cacheVList[cacheIndex]
-        cachePropagation = self.cachePropagationList[cacheIndex]
-        cacheIndex = self.cacheIndexList[cacheIndex]
+    """异步批量读"""
 
-        for i,index in enumerate(indexList):
-           data_p,data_v,data_propagation = self.askDomainByIndex(index)
-           cacheP[i] = data_p
-           cacheV[i] = data_v
-           cachePropagation[i] = data_propagation
-           cacheIndex[i] = index
+    def ansycAsk(self):
+        self.rLock.acquire()
+        if self.readIndex >= self.dataset_size:
+            self.rLock.release()
+            return ()
+        start = self.readIndex
+        end = min(start + self.batch_size, self.dataset_size)
+        self.readIndex = end 
+        self.rLock.release()
 
-    '''异步缓存刷新'''
-    def ansycFresh(self)->None:
-        # 并发控制
-        self.cacheLock.acquire()
-        if self.cacheNextInsertIndex - self.cacheHasWriteIndex == self.params.cacheSize :
-            self.cacheLock.release()
-            return
-        else:
-            self.cacheHasInsertIndex += 1
-        indexList = random.sample(range(self.domainSize),self.params.batch_size)
+        selected_domains = self.domainList[start:end]
+        for domain in selected_domains:
+            domain.update()
 
-        cacheIndex = self.cacheHasInsertIndex
-        self.cacheLock.release()
-        # 刷新
-        self.freshCacheByIndexList(cacheIndex,indexList)
+        selected_data_index = [domain.index for domain in selected_domains]
+        selected_data_p = [domain.data_p for domain in selected_domains]
+        selected_data_v = [domain.data_v for domain in selected_domains]
+        selected_data_propagation = [
+            domain.data_propagation for domain in selected_domains
+        ]
+        return (
+            selected_data_index,
+            torch.stack(selected_data_p, dim=0),
+            torch.stack(selected_data_v, dim=0),
+            torch.stack(selected_data_propagation, dim=0),
+        )
 
-    '''读缓存'''
-    def askCacheData(self):
-        # 并发控制
-        data = None
-        self.cacheLock.acquire()
-        if self.cacheHasReadIndex >= self.cacheNextInsertIndex-1:
+    """批量回写"""
 
-        hasInsertCount = self.params.cacheSize - self.cacheRemain
-        if hasInsertCount > 0:
-            cacheIndex = self.cacheNextInsertIndex - hasInsertCount
-            data = self.cachePList[cacheIndex],self.cacheVList[cacheIndex],self.cachePropagationList[cacheIndex]
-        self.cacheLock.release()
-        return data
-
-
-    '''批量回写'''
-    def setBatchData(self,batchP:torch.Tensor,batchV:torch.Tensor,batchPropagation:torch.Tensor):
-        indexList = self.cache_index
-        for i,index in enumerate(indexList):
+    def setBatchData(
+        self,
+        indexList: List[int],
+        batchP: torch.Tensor,
+        batchV: torch.Tensor,
+        batchPropagation: torch.Tensor,
+    ):
+        batchP, batchV, batchPropagation = (
+            batchP.cpu(),
+            batchV.cpu(),
+            batchPropagation.cpu(),
+        )
+        for i, index in enumerate(indexList):
             domain = self.domainList[index]
             domain.data_p = batchP[i]
             domain.data_v = batchV[i]
             domain.data_propagation = batchPropagation[i]
 
+        self.rLock.acquire()
+        self.writeCount += len(indexList)
+        if self.writeCount == self.dataset_size:
+            self.writeCount = 0
+            self.readIndex = 0
+            random.shuffle(self.domainList)
+        self.rLock.release()
 
 
+def test1():
+    import time
 
+    params = Params()
+    params.batch_size = 100
+    params.dataset_size = 1000
+    datasets = DataSets(params)
+    N = 100
+    wait = 0.1
+    for i in range(N):
+        start_time = time.time()
+        index_list,batchP, batchV, batchPropagation = datasets.ask()
+        batchP, batchV, batchPropagation = batchP.cuda(), batchV.cuda(), batchPropagation.cuda()
+        time.sleep(wait)
+        batchP, batchV, batchPropagation = batchP.cpu(), batchV.cpu(), batchPropagation.cpu()
+        datasets.setBatchData(index_list,batchP, batchV, batchPropagation)
+        end_time = time.time()
+        print(i,f"ask time cost : {end_time - start_time} s")
+    print([domain.step for domain in datasets.domainList])
+
+
+def test2():
+    import threading
+    import queue
+    
+    params = Params()
+    params.batch_size = 100
+    params.dataset_size = 1000
+    datasets = DataSets(params)
+    ask_queue = queue.Queue()
+    tell_queue = queue.Queue()
+
+    def ask(datasets:DataSets,ask_queue:queue.Queue):
+        while True:
+            index_list,batchP, batchV, batchPropagation = datasets.ask()
+            ask_queue.put((index_list,batchP.cuda(), batchV.cuda(), batchPropagation.cuda()))
+
+    def tell(datasets:DataSets,tell_queue:queue.Queue):
+        while True:
+            index_list,batchP, batchV, batchPropagation = tell_queue.get()
+            datasets.setBatchData(index_list,batchP.cpu(), batchV.cpu(), batchPropagation.cpu())
+
+            
+    def train(ask_queue:queue.Queue,tell_queue:queue.Queue):
+        wait = 0.1
+        cost_list = []
+        for i in range(100):
+            start_time = time.time()
+            index_list,batchP, batchV, batchPropagation = ask_queue.get()
+            time.sleep(wait)
+            tell_queue.put((index_list,batchP, batchV, batchPropagation))
+            end_time = time.time()
+            cost = end_time - start_time-wait
+            cost_list.append(cost)
+            print(i,f"ask time cost : {cost} s")
+        print(sum(cost_list)/len(cost_list))
+
+    t_list = []
+    for _ in range(2):
+        t = threading.Thread(target=ask, args=(datasets, ask_queue))
+        t_list.append(t)
+    for _ in range(2):
+        t = threading.Thread(target=tell, args=(datasets, tell_queue))
+        t_list.append(t)
+    for t in t_list:
+        t.start()
+    train(ask_queue,tell_queue)
+    print([domain.step for domain in datasets.domainList])
+
+    
 
 
 if __name__ == "__main__":
-    # params = Params()
-    # dataSets = DataSets(params)
-    # for _ in range(10):
-    #     dataSets.getRandomBatchData()
-    a = torch.Tensor([1,2])
-    b = a[0].clone()
-    a += 1
-    print(a,b)
+    test2()
