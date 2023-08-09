@@ -2,6 +2,7 @@ from typing import List
 from Source import Source
 import torch
 
+
 class Domain:
     def __init__(self, index) -> None:
         self.index: int = index
@@ -11,7 +12,6 @@ class Domain:
         self.data_v: torch.Tensor = None
         self.data_propagation: torch.Tensor = None
 
-    def sourceUpdate(self):
+    def update(self):
         self.step += 1
-        sourceUpdate = self.source.getSourceUpdate()
-        self.data_p += sourceUpdate
+        self.data_p += self.source.getSourceUpdate()
