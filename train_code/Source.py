@@ -1,6 +1,4 @@
 import numpy as np
-from matplotlib import pyplot as plt
-
 
 class Source:
     def __init__(self, sourceMask: np.array, sourceExpression: np.array) -> None:
@@ -16,3 +14,4 @@ class Source:
 
         self.stepRecord += 1
         return change * self.sourceMask
+

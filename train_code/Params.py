@@ -12,7 +12,7 @@ class Params(object):
         self.precision = 2
         self.netName = ""
         self.train_env_types = ["super_simple", "oscillator", "simple"]
-        self.batch_size = 50
+        self.batch_size = 5
         self.dataset_size: int = 1000
         self.lr = 0.0001
         self.lr_grad = 0.001
@@ -32,8 +32,13 @@ class Params(object):
         self.maxT = 200
         self.minBiasRate = 0.3
         self.maxBiasRate = 0.7
-        self.WHRate = 0.05
+        self.whRate = 0.05
         self.boundaryRate = 0.3
 
+        '''
+        缓存配置
+        '''
+        self.cacheSize =  5
 
-p = Params()
+
+
