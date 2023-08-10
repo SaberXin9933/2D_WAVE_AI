@@ -16,7 +16,7 @@ seed = 777  # seed必须是int，可以自行设置
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)  # 让显卡产生的随机数一致
 torch.cuda.manual_seed_all(seed)  # 多卡模式下，让所有显卡生成的随机数一致？这个待验证
-
+torch.set_num_threads(4)
 params = Params()
 assert params.is_cuda == True
 assert params.type == "train"
@@ -30,8 +30,8 @@ modelManager = ModelManager(context)
 
 datasets = DataSets(context)
 model, optimizer = modelManager.getNetAndOptimizer(params.loadIndex)
-ask_queue = queue.Queue()
-tell_queue = queue.Queue()
+ask_queue = queue.Queue(2)
+tell_queue = queue.Queue(2)
 
 threading_list = []
 for _ in range(2):
@@ -60,7 +60,7 @@ for epoch in range(params.loadIndex + 1, params.n_epochs):
         loss.backward()
         optimizer.step()
         tell_queue.put(
-            (index_list, p_new.detach(), v_new.detach(), batchPropagation.detach())
+            (index_list, p_new.detach().clone(), v_new.detach().clone(), batchPropagation.detach().clone())
         )
         if i % 50 == 0:
             loss = loss.detach().cpu().numpy()

@@ -142,9 +142,9 @@ def ask(datasets: DataSets, ask_queue: queue.Queue):
         ask_queue.put(
             (
                 index_list,
-                batchP.to(device),
-                batchV.to(device),
-                batchPropagation.to(device),
+                batchP.clone().to(device),
+                batchV.clone().to(device),
+                batchPropagation.clone().to(device),
             )
         )
 
