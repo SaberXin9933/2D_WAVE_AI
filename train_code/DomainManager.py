@@ -50,9 +50,9 @@ class DomainManager:
     def getPMLField(self):
         field_line = torch.flip(
             1
-            - np.log(1 / (0.000001))
+            - np.log(1 / (0.001))
             * (1.5 * self.params.c / self.params.pml_width)
-            * (torch.arange(self.params.pml_width) / self.params.pml_width),
+            * (torch.arange(self.params.pml_width) / self.params.pml_width)**2,
             dims=[0],
         )
         field_line /= torch.max(field_line)
@@ -112,10 +112,10 @@ def test3():
     context = Context()
     mananger = DomainManager(context)
     pmlField = mananger.getPMLField()
-    line = pmlField[:,100,:].squeeze().numpy()
+    line = pmlField[:,:,100].squeeze().numpy()
     plt.scatter(range(len(line)),line)
     plt.show()
 
 
 if __name__ == "__main__":
-    test2()
+    test3()

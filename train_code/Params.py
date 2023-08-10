@@ -7,14 +7,16 @@ class Params(object):
         实验配置
         """
         self.precision = 2
-        self.netName = ""
+        self.netName = "Spinn_Wave_Model"
+        self.optimizerName = "Adam"
+        self.netHiddenSize = 32
         self.train_env_types = ["super_simple", "oscillator", "simple"]
-        self.batch_size = 100
+        self.batch_size = 10
         self.dataset_size: int = 1000
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
-        self.domainHeight = 400
+        self.domainHeight = 200
         self.pml_width = 40
         self.rho = 1
         self.c = 1
@@ -54,7 +56,14 @@ class Params(object):
         """
         上下文配置
         """
+        self.loadIndex = 5
         self.name = "default"
-        self.savePath = None
-        self.type = "test"
-        self.index = None
+        self.type = "train"
+        self.index = "20230810_215738" # "20230810_215738"
+
+        """
+        训练配置
+        """
+        self.n_epochs = 10
+        self.n_batches_per_epoch = 10
+        self.reset_freq = 0.0003

@@ -11,7 +11,10 @@ def count_subdirectories(path):
     ]
     return len(subdirectories)
 
+
 def copy_tree(fromDir, TargetDir):
+    if len(os.listdir(TargetDir)) > 0:
+        return
     for item in os.listdir(fromDir):
         src_item = os.path.join(fromDir, item)
         dst_item = os.path.join(TargetDir, item)

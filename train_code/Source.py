@@ -8,8 +8,6 @@ class Source:
         self.sourceExpression: np.array = sourceExpression
 
     def getSourceUpdate(self):
-        if self.stepRecord > 100:
-            return 0
         nextStep = self.stepRecord + 1
         nowStep = self.stepRecord
         change = (

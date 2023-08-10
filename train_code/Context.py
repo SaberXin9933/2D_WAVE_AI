@@ -6,6 +6,7 @@ from time import strftime
 from uitls.osUtils import count_subdirectories, copy_tree
 from Params import Params
 import torch
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Context(object):
@@ -15,6 +16,7 @@ class Context(object):
         self.init_dir()
         self.init_logger()
         self.init_device()
+        self.init_tensorboard()
         self.code_flash_save()
 
         # XX
@@ -43,6 +45,13 @@ class Context(object):
         self.logger.addHandler(self.get_console_handler())
         # 设置日志的默认级别
         self.logger.setLevel(logging.DEBUG)
+
+    # Tensorboard 初始化
+    def init_tensorboard(self):
+        if self.params.type != "train":
+            return
+        tensorboard_dir = check_path(f"{self.base_path}/tensorboard/")
+        self.tbWriter = SummaryWriter(tensorboard_dir)
 
     # 设备初始化
     def init_device(self):

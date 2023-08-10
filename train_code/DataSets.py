@@ -11,10 +11,12 @@ import threading
 import queue
 import time
 from Context import Context
+import os
 
 
 class DataSets:
     def __init__(self, context: Context) -> None:
+        self.context = context
         self.params = params = context.params
         self.log = context.logger
         self.dataset_size = params.dataset_size
@@ -23,12 +25,8 @@ class DataSets:
         self.askFailWaitTime = params.ask_fail_wait_time
 
         # 域管理类初始化
-        self.sourceManager = SourceManager(
-            context
-        )
-        self.domainManager = DomainManager(
-            context,self.sourceManager
-        )
+        self.sourceManager = SourceManager(context)
+        self.domainManager = DomainManager(context, self.sourceManager)
 
         # 计算域数据初始化
         self.domainList = self.getDomainList(params.dataset_size)
@@ -63,10 +61,15 @@ class DataSets:
     """同步批量读"""
 
     def ask(self):
+        retryCount = 0
         while True:
+            if retryCount > 100:
+                self.log.error(f"ask fail,max retry times")
+                os._exit(1)
             data = self.ansycAsk()
             if data == ():
-                time.sleep(self.askFailWaitTime)
+                retryCount += 1
+                time.sleep(self.askFailWaitTime*retryCount)
             else:
                 return data
 
@@ -114,10 +117,14 @@ class DataSets:
             batchPropagation.cpu(),
         )
         for i, index in enumerate(indexList):
-            domain = self.domainList[index]
-            domain.data_p = batchP[i]
-            domain.data_v = batchV[i]
-            domain.data_propagation = batchPropagation[i]
+            if self.params.type == "train" and random.random() < self.params.reset_freq:
+                self.domainList[index] = self.domainManager.getRandomDomain(index)
+                self.log.info(f"reset_{index}")
+            else:
+                domain = self.domainList[index]
+                domain.data_p = batchP[i]
+                domain.data_v = batchV[i]
+                domain.data_propagation = batchPropagation[i]
 
         self.rLock.acquire()
         self.writeCount += len(indexList)
@@ -129,10 +136,16 @@ class DataSets:
 
 
 def ask(datasets: DataSets, ask_queue: queue.Queue):
+    device = datasets.context.device
     while True:
         index_list, batchP, batchV, batchPropagation = datasets.ask()
         ask_queue.put(
-            (index_list, batchP.cuda(), batchV.cuda(), batchPropagation.cuda())
+            (
+                index_list,
+                batchP.to(device),
+                batchV.to(device),
+                batchPropagation.to(device),
+            )
         )
 
 
@@ -176,7 +189,7 @@ def test1():
 
 def train_test():
     context = Context()
-    params = context.params 
+    params = context.params
     params.batch_size = 100
     params.dataset_size = 1000
     datasets = DataSets(context)
@@ -187,9 +200,11 @@ def train_test():
     t_list = []
     for _ in range(2):
         t = threading.Thread(target=ask, args=(datasets, ask_queue))
+        t.daemon = True
         t_list.append(t)
-    for _ in range(2):
+    for _ in range(0):
         t = threading.Thread(target=tell, args=(datasets, tell_queue))
+        t.daemon = True
         t_list.append(t)
     for t in t_list:
         t.start()
