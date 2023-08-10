@@ -14,8 +14,8 @@ class Params(object):
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
-        self.domainHeight = 200
-        self.pml_width = 30
+        self.domainHeight = 400
+        self.pml_width = 40
         self.rho = 1
         self.c = 1
         self.delta_t = 1
@@ -24,9 +24,9 @@ class Params(object):
         """
         源项
         """
-        self.pointNumber = 200
+        self.pointNumber = 100
         self.minT = 20
-        self.maxT = 200
+        self.maxT = 100
         self.minBiasRate = 0.3
         self.maxBiasRate = 0.7
         self.whRate = 0.05

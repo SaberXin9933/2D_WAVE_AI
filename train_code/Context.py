@@ -9,9 +9,9 @@ import torch
 
 
 class Context(object):
-    def __init__(self):
+    def __init__(self, params=None):
         self.savePath = SAVE_PATH
-        self.params = Params()
+        self.params = Params() if params == None else params
         self.init_dir()
         self.init_logger()
         self.init_device()

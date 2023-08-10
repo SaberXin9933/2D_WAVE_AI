@@ -24,18 +24,10 @@ class DataSets:
 
         # 域管理类初始化
         self.sourceManager = SourceManager(
-            params.domainWidth,
-            params.domainHeight,
-            params.whRate,
-            params.boundaryRate,
-            params.pointNumber,
-            params.minT,
-            params.maxT,
-            params.minBiasRate,
-            params.maxBiasRate,
+            context
         )
         self.domainManager = DomainManager(
-            params.domainWidth, params.domainHeight, self.sourceManager
+            context,self.sourceManager
         )
 
         # 计算域数据初始化
@@ -109,7 +101,7 @@ class DataSets:
 
     """批量回写"""
 
-    def setBatchData(
+    def updateData(
         self,
         indexList: List[int],
         batchP: torch.Tensor,
@@ -147,7 +139,7 @@ def ask(datasets: DataSets, ask_queue: queue.Queue):
 def tell(datasets: DataSets, tell_queue: queue.Queue):
     while True:
         index_list, batchP, batchV, batchPropagation = tell_queue.get()
-        datasets.setBatchData(
+        datasets.updateData(
             index_list, batchP.cpu(), batchV.cpu(), batchPropagation.cpu()
         )
 
@@ -176,7 +168,7 @@ def test1():
             batchV.cpu(),
             batchPropagation.cpu(),
         )
-        datasets.setBatchData(index_list, batchP, batchV, batchPropagation)
+        datasets.updateData(index_list, batchP, batchV, batchPropagation)
         end_time = time.time()
         print(i, f"ask time cost : {end_time - start_time} s")
     print([domain.step for domain in datasets.domainList])
