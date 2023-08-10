@@ -7,13 +7,20 @@ import torch
 import random
 from threading import Lock as TLock
 import time
+import threading
+import queue
+import time
+from Context import Context
 
 
 class DataSets:
-    def __init__(self, params: Params) -> None:
+    def __init__(self, context: Context) -> None:
+        self.params = params = context.params
+        self.log = context.logger
         self.dataset_size = params.dataset_size
         self.batch_size = params.batch_size
         self.is_cuda = params.is_cuda
+        self.askFailWaitTime = params.ask_fail_wait_time
 
         # 域管理类初始化
         self.sourceManager = SourceManager(
@@ -41,10 +48,12 @@ class DataSets:
     """获取单个计算域配置"""
 
     def getDomainList(self, domainSize: int) -> List[Domain]:
+        self.log.info("domain generate start...")
         domainList = []
         for index in range(domainSize):
             domain = self.domainManager.getRandomDomain(index)
             domainList.append(domain)
+        self.log.info("domain generate success !!!")
         return domainList
 
     """索引获取"""
@@ -58,13 +67,14 @@ class DataSets:
 
     def askDomainListByIndexList(self, indexList: List[int]) -> List[Domain]:
         return [self.askDomainByIndex(index) for index in indexList]
-    
+
     """同步批量读"""
+
     def ask(self):
         while True:
             data = self.ansycAsk()
             if data == ():
-                time.sleep(0.1)
+                time.sleep(self.askFailWaitTime)
             else:
                 return data
 
@@ -77,7 +87,7 @@ class DataSets:
             return ()
         start = self.readIndex
         end = min(start + self.batch_size, self.dataset_size)
-        self.readIndex = end 
+        self.readIndex = end
         self.rLock.release()
 
         selected_domains = self.domainList[start:end]
@@ -126,9 +136,26 @@ class DataSets:
         self.rLock.release()
 
 
-def test1():
-    import time
+def ask(datasets: DataSets, ask_queue: queue.Queue):
+    while True:
+        index_list, batchP, batchV, batchPropagation = datasets.ask()
+        ask_queue.put(
+            (index_list, batchP.cuda(), batchV.cuda(), batchPropagation.cuda())
+        )
 
+
+def tell(datasets: DataSets, tell_queue: queue.Queue):
+    while True:
+        index_list, batchP, batchV, batchPropagation = tell_queue.get()
+        datasets.setBatchData(
+            index_list, batchP.cpu(), batchV.cpu(), batchPropagation.cpu()
+        )
+
+
+"""测试函数"""
+
+
+def test1():
     params = Params()
     params.batch_size = 100
     params.dataset_size = 1000
@@ -137,51 +164,33 @@ def test1():
     wait = 0.1
     for i in range(N):
         start_time = time.time()
-        index_list,batchP, batchV, batchPropagation = datasets.ask()
-        batchP, batchV, batchPropagation = batchP.cuda(), batchV.cuda(), batchPropagation.cuda()
+        index_list, batchP, batchV, batchPropagation = datasets.ask()
+        batchP, batchV, batchPropagation = (
+            batchP.cuda(),
+            batchV.cuda(),
+            batchPropagation.cuda(),
+        )
         time.sleep(wait)
-        batchP, batchV, batchPropagation = batchP.cpu(), batchV.cpu(), batchPropagation.cpu()
-        datasets.setBatchData(index_list,batchP, batchV, batchPropagation)
+        batchP, batchV, batchPropagation = (
+            batchP.cpu(),
+            batchV.cpu(),
+            batchPropagation.cpu(),
+        )
+        datasets.setBatchData(index_list, batchP, batchV, batchPropagation)
         end_time = time.time()
-        print(i,f"ask time cost : {end_time - start_time} s")
+        print(i, f"ask time cost : {end_time - start_time} s")
     print([domain.step for domain in datasets.domainList])
 
 
-def test2():
-    import threading
-    import queue
-    
-    params = Params()
+def train_test():
+    context = Context()
+    params = context.params 
     params.batch_size = 100
     params.dataset_size = 1000
-    datasets = DataSets(params)
+    datasets = DataSets(context)
     ask_queue = queue.Queue()
     tell_queue = queue.Queue()
-
-    def ask(datasets:DataSets,ask_queue:queue.Queue):
-        while True:
-            index_list,batchP, batchV, batchPropagation = datasets.ask()
-            ask_queue.put((index_list,batchP.cuda(), batchV.cuda(), batchPropagation.cuda()))
-
-    def tell(datasets:DataSets,tell_queue:queue.Queue):
-        while True:
-            index_list,batchP, batchV, batchPropagation = tell_queue.get()
-            datasets.setBatchData(index_list,batchP.cpu(), batchV.cpu(), batchPropagation.cpu())
-
-            
-    def train(ask_queue:queue.Queue,tell_queue:queue.Queue):
-        wait = 0.1
-        cost_list = []
-        for i in range(100):
-            start_time = time.time()
-            index_list,batchP, batchV, batchPropagation = ask_queue.get()
-            time.sleep(wait)
-            tell_queue.put((index_list,batchP, batchV, batchPropagation))
-            end_time = time.time()
-            cost = end_time - start_time-wait
-            cost_list.append(cost)
-            print(i,f"ask time cost : {cost} s")
-        print(sum(cost_list)/len(cost_list))
+    wait = 0.1
 
     t_list = []
     for _ in range(2):
@@ -192,11 +201,22 @@ def test2():
         t_list.append(t)
     for t in t_list:
         t.start()
-    train(ask_queue,tell_queue)
-    print([domain.step for domain in datasets.domainList])
 
-    
+    cost_list = []
+    for i in range(100):
+        start_time = time.time()
+        index_list, batchP, batchV, batchPropagation = ask_queue.get()
+        time.sleep(wait)
+        tell_queue.put((index_list, batchP, batchV, batchPropagation))
+        end_time = time.time()
+        cost = end_time - start_time - wait
+        cost_list.append(cost)
+        print(i, f"ask time cost : {cost} s")
+
+    print(sum(cost_list) / len(cost_list))
+
+    print([domain.step for domain in datasets.domainList])
 
 
 if __name__ == "__main__":
-    test2()
+    train_test()

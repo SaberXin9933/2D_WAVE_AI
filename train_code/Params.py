@@ -1,7 +1,4 @@
-import json
-import sys
-import os
-import warnings
+import torch
 
 
 class Params(object):
@@ -36,11 +33,28 @@ class Params(object):
         self.boundaryRate = 0.3
 
         """
+        差分卷积核
+        """
+        self.kernel_point_number = 2
+        self.kernel_order = 1
+        self.kernel_delta = 1
+
+        """
         缓存配置
         """
         self.cacheSize = 5
+        self.ask_fail_wait_time = 0.01
 
         """
         pytorch配置
         """
         self.is_cuda = True
+        self.dtype = torch.float32
+
+        """
+        上下文配置
+        """
+        self.name = "default"
+        self.savePath = None
+        self.type = "test"
+        self.index = None
