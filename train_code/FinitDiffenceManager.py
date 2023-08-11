@@ -63,14 +63,14 @@ def test1():
     params.is_cuda = False
     context = Context(params)
 
-    FinitDiffenceManager = FinitDiffenceManager(context)
+    finitDiffenceManager = FinitDiffenceManager(context)
     dataSets = DataSets(context)
     for i in range(10000):
         index_list, batchP, batchV, batchPropagation = dataSets.ask()
         # batchPropagation = torch.ones_like(batchPropagation)
-        newP, newV = FinitDiffenceManager.cf_step(batchP, batchV, batchPropagation)
+        newP, newV = finitDiffenceManager.cf_step(batchP, batchV, batchPropagation)
         dataSets.updateData(index_list, newP, newV, batchPropagation)
-        loss_p, loss_vx, loss_vy = FinitDiffenceManager.physic_cf_loss(batchP, batchV, newP, newV, batchPropagation)
+        loss_p, loss_vx, loss_vy = finitDiffenceManager.physic_cf_loss(batchP, batchV, newP, newV, batchPropagation)
         print(torch.mean(loss_p**2),torch.mean(loss_vx**2),torch.mean(loss_vy**2))
         if i > 300:
             plt.clf()
