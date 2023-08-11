@@ -12,7 +12,7 @@ class Params(object):
         self.netHiddenSize = 32
         self.train_env_types = ["super_simple", "oscillator", "simple"]
         self.batch_size = 100
-        self.dataset_size: int = 1000
+        self.dataset_size: int = 2000
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
