@@ -17,9 +17,11 @@ torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)  # 让显卡产生的随机数一致
 torch.cuda.manual_seed_all(seed)  # 多卡模式下，让所有显卡生成的随机数一致？这个待验证
 torch.set_num_threads(4)
+
 params = Params()
-assert params.is_cuda == True
-assert params.type == "train"
+params.type = "train"
+params.is_cuda == True
+params.name = "simpleTrain"
 
 context = Context(params)
 log = context.logger
