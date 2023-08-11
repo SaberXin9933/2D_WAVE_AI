@@ -1,11 +1,5 @@
 import os
-
-def check_path(path:str) -> str:
-    if not path:
-        raise EOFError
-    if not os.path.exists(path=path):
-        os.makedirs(path)
-    return path
+from utils.osUtils import check_path
 
 PROJECT_PATH = check_path(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CODE_PATH = check_path(PROJECT_PATH + "/train_code")

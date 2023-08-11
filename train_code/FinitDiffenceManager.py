@@ -58,6 +58,9 @@ def test1():
     from matplotlib import pyplot as plt
 
     params = Params()
+    params.kernel_point_number = 4
+    params.minT = 15
+    params.maxT = 40
     params.batch_size = 1
     params.dataset_size = 1
     params.is_cuda = False
@@ -65,16 +68,27 @@ def test1():
 
     finitDiffenceManager = FinitDiffenceManager(context)
     dataSets = DataSets(context)
+
+    sourceExpression = dataSets.domainList[0].source.sourceExpression
+    plt.scatter(range(sourceExpression.size), sourceExpression)
+    plt.show()
     for i in range(10000):
         index_list, batchP, batchV, batchPropagation = dataSets.ask()
         # batchPropagation = torch.ones_like(batchPropagation)
         newP, newV = finitDiffenceManager.cf_step(batchP, batchV, batchPropagation)
         dataSets.updateData(index_list, newP, newV, batchPropagation)
-        loss_p, loss_vx, loss_vy = finitDiffenceManager.physic_cf_loss(batchP, batchV, newP, newV, batchPropagation)
-        print(torch.mean(loss_p**2),torch.mean(loss_vx**2),torch.mean(loss_vy**2))
-        if i > 300:
+        loss_p, loss_vx, loss_vy = finitDiffenceManager.physic_cf_loss(
+            batchP, batchV, newP, newV, batchPropagation
+        )
+        print(
+            i,
+            torch.mean(loss_p**2),
+            torch.mean(loss_vx**2),
+            torch.mean(loss_vy**2),
+        )
+        if i > 100:
             plt.clf()
-            plt.matshow(newP[:, :, 1:-1, 1:-1].squeeze().numpy(), fignum=0)
+            plt.matshow(batchP.squeeze().numpy(), fignum=0, vmin=-1, vmax=1)
             plt.colorbar()
             plt.pause(0.01)
 

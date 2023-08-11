@@ -2,6 +2,14 @@ import os
 import shutil
 
 
+def check_path(path: str) -> str:
+    if not path:
+        raise EOFError
+    if not os.path.exists(path=path):
+        os.makedirs(path)
+    return path
+
+
 def count_subdirectories(path):
     if not os.path.isdir(path):
         raise ValueError("The provided path is not a directory.")

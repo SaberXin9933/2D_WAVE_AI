@@ -27,6 +27,7 @@ class Params(object):
         源项
         """
         self.pointNumber = 100
+        self.decay_point = 20
         self.minT = 20
         self.maxT = 100
         self.minBiasRate = 0.3
@@ -67,3 +68,4 @@ class Params(object):
         self.n_epochs = 1000
         self.n_batches_per_epoch = 10000
         self.reset_freq = 0.0003
+        self.train_save_per_sample_times = 1000

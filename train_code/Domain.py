@@ -14,4 +14,6 @@ class Domain:
 
     def update(self):
         self.step += 1
-        self.data_p += self.source.getSourceUpdate()
+        sourcePointList = self.source.getSourceUpdate()
+        for sourcePoint in sourcePointList:
+            self.data_p[:, sourcePoint.x, sourcePoint.y] = sourcePoint.val

@@ -1,19 +1,26 @@
 import numpy as np
+from typing import List
+
+
+class SourcePoint:
+    def __init__(self, x, y, val) -> None:
+        self.x = x
+        self.y = y
+        self.val = val
 
 
 class Source:
-    def __init__(self, sourceMask: np.array, sourceExpression: np.array) -> None:
+    def __init__(
+        self, sourcePointList: List[SourcePoint], sourceExpression: np.array
+    ) -> None:
         self.stepRecord = 0
-        self.sourceMask: np.array = sourceMask
+        self.sourcePointList: List[SourcePoint] = sourcePointList
         self.sourceExpression: np.array = sourceExpression
 
-    def getSourceUpdate(self):
-        nextStep = self.stepRecord + 1
+    def getSourceUpdate(self) -> List[SourcePoint]:
         nowStep = self.stepRecord
-        change = (
-            self.sourceExpression[nextStep % len(self.sourceExpression)]
-            - self.sourceExpression[nowStep % len(self.sourceExpression)]
-        )
-
+        change = self.sourceExpression[nowStep % len(self.sourceExpression)]
+        for i in range(len(self.sourcePointList)):
+            self.sourcePointList[i].val = change
         self.stepRecord += 1
-        return change * self.sourceMask
+        return self.sourcePointList
