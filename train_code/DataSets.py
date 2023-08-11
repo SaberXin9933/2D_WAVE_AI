@@ -30,6 +30,7 @@ class DataSets:
 
         # 计算域数据初始化
         self.domainList = self.getDomainList(params.dataset_size)
+        self.indexList = [i for i in range(params.dataset_size)]
         self.domainSize = params.dataset_size
         self.readIndex = 0
         self.writeCount = 0
@@ -85,7 +86,7 @@ class DataSets:
         self.readIndex = end
         self.rLock.release()
 
-        selected_domains = self.domainList[start:end]
+        selected_domains = [self.domainList[index] for index in self.indexList[start:end]]
         for domain in selected_domains:
             domain.update()
 
@@ -111,11 +112,6 @@ class DataSets:
         batchV: torch.Tensor,
         batchPropagation: torch.Tensor,
     ):
-        batchP, batchV, batchPropagation = (
-            batchP.cpu(),
-            batchV.cpu(),
-            batchPropagation.cpu(),
-        )
         for i, index in enumerate(indexList):
             if self.params.type == "train" and random.random() < self.params.reset_freq:
                 self.domainList[index] = self.domainManager.getRandomDomain(index)
@@ -131,30 +127,32 @@ class DataSets:
         if self.writeCount == self.dataset_size:
             self.writeCount = 0
             self.readIndex = 0
-            random.shuffle(self.domainList)
+            random.shuffle(self.indexList)
         self.rLock.release()
 
 
 def ask(datasets: DataSets, ask_queue: queue.Queue):
-    device = datasets.context.device
-    while True:
-        index_list, batchP, batchV, batchPropagation = datasets.ask()
-        ask_queue.put(
-            (
-                index_list,
-                batchP.clone().to(device),
-                batchV.clone().to(device),
-                batchPropagation.clone().to(device),
+    with torch.no_grad():
+        device = datasets.context.device
+        while True:
+            index_list, batchP, batchV, batchPropagation = datasets.ask()
+            ask_queue.put(
+                (
+                    index_list,
+                    batchP.to(device),
+                    batchV.to(device),
+                    batchPropagation.to(device),
+                )
             )
-        )
 
 
 def tell(datasets: DataSets, tell_queue: queue.Queue):
-    while True:
-        index_list, batchP, batchV, batchPropagation = tell_queue.get()
-        datasets.updateData(
-            index_list, batchP.cpu(), batchV.cpu(), batchPropagation.cpu()
-        )
+    with torch.no_grad():
+        while True:
+            index_list, batchP, batchV, batchPropagation = tell_queue.get()
+            datasets.updateData(
+                index_list, batchP.detach().cpu(), batchV.detach().cpu(), batchPropagation.detach().cpu()
+            )
 
 
 """测试函数"""
@@ -202,7 +200,7 @@ def train_test():
         t = threading.Thread(target=ask, args=(datasets, ask_queue))
         t.daemon = True
         t_list.append(t)
-    for _ in range(0):
+    for _ in range(2):
         t = threading.Thread(target=tell, args=(datasets, tell_queue))
         t.daemon = True
         t_list.append(t)
@@ -210,7 +208,7 @@ def train_test():
         t.start()
 
     cost_list = []
-    for i in range(100):
+    for i in range(100000):
         start_time = time.time()
         index_list, batchP, batchV, batchPropagation = ask_queue.get()
         time.sleep(wait)
