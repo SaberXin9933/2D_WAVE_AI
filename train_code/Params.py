@@ -50,7 +50,7 @@ class Params(object):
         """
         pytorch配置
         """
-        self.is_cuda = True
+        self.is_cuda = False
         self.dtype = torch.float32
 
         """
@@ -58,7 +58,7 @@ class Params(object):
         """
         self.loadIndex = -1  # "-1"
         self.name = "default"
-        self.type = "train"  # "train" "test"
+        self.type = None  # "train" "test"
         self.index = None  # None "20230810_215738"
 
         """
