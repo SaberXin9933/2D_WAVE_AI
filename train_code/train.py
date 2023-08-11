@@ -18,7 +18,7 @@ set_num_threads(4)
 
 params = Params()
 params.type = "train"
-params.is_cuda == True
+params.is_cuda = True
 params.name = "simpleTrain"
 
 context = Context(params)
@@ -47,7 +47,7 @@ for t in threading_list:
 
 
 for epoch in range(params.loadIndex + 1, params.n_epochs):
-    resetRandomTorchSeed()
+    # resetRandomTorchSeed()
     model.train()
     for i in range(params.n_batches_per_epoch):
         index_list, p_old, v_old, batchPropagation = ask_queue.get()
