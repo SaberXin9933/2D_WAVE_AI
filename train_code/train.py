@@ -7,17 +7,14 @@ import torch
 import queue
 import time, os, random
 from utils.pltUtils import save_2d_tensor_fig
+from utils.torchUtils import set_num_threads, resetRandomTorchSeed
 
 
 def mse(loss):
     return torch.mean(torch.pow(loss, 2), dim=(1, 2, 3))
 
 
-seed = 777  # seed必须是int，可以自行设置
-torch.manual_seed(seed)
-torch.cuda.manual_seed(seed)  # 让显卡产生的随机数一致
-torch.cuda.manual_seed_all(seed)  # 多卡模式下，让所有显卡生成的随机数一致？这个待验证
-torch.set_num_threads(6)
+set_num_threads(4)
 
 params = Params()
 params.type = "train"
@@ -50,6 +47,7 @@ for t in threading_list:
 
 
 for epoch in range(params.loadIndex + 1, params.n_epochs):
+    resetRandomTorchSeed()
     model.train()
     for i in range(params.n_batches_per_epoch):
         index_list, p_old, v_old, batchPropagation = ask_queue.get()
@@ -102,13 +100,17 @@ for epoch in range(params.loadIndex + 1, params.n_epochs):
                 p_old[save_index].squeeze().detach().cpu().numpy(),
             )
             save_2d_tensor_fig(
-                f"{img_dir}/train_i{i // params.train_save_per_sample_times}_vx.png",
+                f"{img_dir}/train_{i // params.train_save_per_sample_times}_vx.png",
                 v_old[save_index, 0].squeeze().detach().cpu().numpy(),
             )
             save_2d_tensor_fig(
-                f"{img_dir}/train_i{i // params.train_save_per_sample_times}_vy.png",
+                f"{img_dir}/train_{i // params.train_save_per_sample_times}_vy.png",
                 v_old[save_index, 1].squeeze().detach().cpu().numpy(),
+            )
+            log.info(
+                f"save train img success,save path:{img_dir}/train_{i // params.train_save_per_sample_times}_XXX.png"
             )
 
     # save model
     modelManager.saveNetAndOptimizer(model, optimizer, epoch)
+    log.info(f"model save epoch:{epoch} success")

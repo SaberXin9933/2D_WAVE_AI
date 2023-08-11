@@ -44,6 +44,8 @@ class DataSets:
         for index in range(domainSize):
             domain = self.domainManager.getRandomDomain(index)
             domainList.append(domain)
+            if index != 0 and (10 * index) % domainSize == 0:
+                self.log.info(f"domain has generate {100*index/(domainSize)}%")
         self.log.info("domain generate success !!!")
         return domainList
 
@@ -70,7 +72,7 @@ class DataSets:
             data = self.ansycAsk()
             if data == ():
                 retryCount += 1
-                time.sleep(self.askFailWaitTime*retryCount)
+                time.sleep(self.askFailWaitTime * retryCount)
             else:
                 return data
 
@@ -86,7 +88,9 @@ class DataSets:
         self.readIndex = end
         self.rLock.release()
 
-        selected_domains = [self.domainList[index] for index in self.indexList[start:end]]
+        selected_domains = [
+            self.domainList[index] for index in self.indexList[start:end]
+        ]
         for domain in selected_domains:
             domain.update()
 
@@ -151,7 +155,10 @@ def tell(datasets: DataSets, tell_queue: queue.Queue):
         while True:
             index_list, batchP, batchV, batchPropagation = tell_queue.get()
             datasets.updateData(
-                index_list, batchP.detach().cpu(), batchV.detach().cpu(), batchPropagation.detach().cpu()
+                index_list,
+                batchP.detach().cpu(),
+                batchV.detach().cpu(),
+                batchPropagation.detach().cpu(),
             )
 
 
