@@ -87,28 +87,30 @@ class SourceManager:
 
 if __name__ == "__main__":
     from matplotlib import pyplot as plt
-
-    w = 200
-    h = 200
-    whRate = 0.07
-    boundaryRate = 0.2
-    pointNumber = 200
-    minT = 30
-    maxT = 200
-    minBiasRate = 0.3
-    maxBiasRate = 0.7
+    from Context import Params
+    params = Params()
+    params.domainWidth = 200
+    params.domainHeight = 200
+    params.whRate = 0.07
+    params.boundaryRate = 0.2
+    params.pointNumber = 200
+    params.minT = 30
+    params.maxT = 200
+    params.minBiasRate = 0.3
+    params.maxBiasRate = 0.7
+    context = Context(params)
     sourceManager = SourceManager(
-        w, h, whRate, boundaryRate, pointNumber, minT, maxT, minBiasRate, maxBiasRate
+        context
     )
     source: Source = sourceManager.getRandomSouce()
 
     for i in range(100):
-        print(source.stepRecord, np.max(np.abs(source.getSourceUpdate())))
+        print(source.stepRecord, torch.max(torch.abs(source.getSourceUpdate())).float())
 
     # plt.matshow(source.sourceMask)
     # plt.colorbar()
 
-    swx = np.arange(pointNumber)
+    swx = np.arange(params.pointNumber)
     plt.scatter(swx, source.sourceExpression)
 
     plt.tight_layout()  # This helps prevent overlapping of subplots
