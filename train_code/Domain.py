@@ -1,6 +1,7 @@
 from typing import List
 from Source import Source
 import torch
+import time
 
 
 class Domain:
@@ -14,6 +15,12 @@ class Domain:
 
     def update(self):
         self.step += 1
-        sourcePointList = self.source.getSourceUpdate()
-        for sourcePoint in sourcePointList:
-            self.data_p[:, sourcePoint.x, sourcePoint.y] = sourcePoint.val
+        sourceExpression = self.source.sourceExpression
+        change = sourceExpression[self.step % len(sourceExpression)]
+        sourceMask = self.source.sourceMask
+
+        self.data_p[
+            :,
+            sourceMask.leftTopX : sourceMask.leftTopX + sourceMask.sourceWidth,
+            sourceMask.leftTopY : sourceMask.leftTopY + sourceMask.sourceHeight,
+        ] = change

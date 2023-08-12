@@ -11,8 +11,6 @@ class Params(object):
         self.optimizerName = "Adam"
         self.netHiddenSize = 32
         self.train_env_types = ["super_simple", "oscillator", "simple"]
-        self.batch_size = 100
-        self.dataset_size: int = 1000
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
@@ -41,12 +39,7 @@ class Params(object):
         self.kernel_point_number = 2
         self.kernel_order = 1
         self.kernel_delta = 1
-
-        """
-        缓存配置
-        """
-        self.cacheSize = 5
-        self.ask_fail_wait_time = 0.01
+        
 
         """
         pytorch配置
@@ -69,3 +62,8 @@ class Params(object):
         self.n_batches_per_epoch = 10000
         self.reset_freq = 0.0003
         self.train_save_per_sample_times = 1000
+        self.ask_fail_wait_time = 0.0001
+        self.batch_size = 100
+        self.datasetNum = 5
+        self.dataset_size: int = 600
+

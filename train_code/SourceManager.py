@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from Source import Source, SourcePoint
+from Source import Source, SourceMask
 from Context import Context
 from typing import List
 from utils.mathUtils import sigmodNP
@@ -21,8 +21,8 @@ class SourceManager:
         self.maxBiasRate = params.maxBiasRate
         self.dtype = params.dtype
 
-    def getRandomSouce(self):
-        sourcePointList = self.getRandomPointList(
+    def getRandomSouce(self) -> Source:
+        sourcePointList = self.getRandomSourceMask(
             self.domainWidth, self.domainHeight, self.whRate, self.boundaryRate
         )
         sourceExpression = self.getRandomSourceExpression(
@@ -36,32 +36,29 @@ class SourceManager:
 
         return Source(sourcePointList, sourceExpression)
 
-    def getSourcePointList(
+    def getSourceMask(
         self,
-        centerX: int,
-        centerY: int,
+        leftTopX: int,
+        leftTopY: int,
         sourceWidth: int,
         sourceHeight: int,
-    ) -> List[SourcePoint]:
-        sourcePointList = []
-        for x in range(centerX - sourceWidth // 2, centerX + sourceWidth // 2):
-            for y in range(centerY - sourceHeight // 2, centerY + sourceHeight // 2):
-                sourcePointList.append(SourcePoint(x, y, 0))
-        return sourcePointList
+    ) -> SourceMask:
+        mask = torch.ones(sourceWidth, sourceHeight)
+        return SourceMask(leftTopX, leftTopY, sourceWidth, sourceHeight, mask)
 
-    def getRandomPointList(
+    def getRandomSourceMask(
         self, domainWidth: int, domainHeight: int, whMaxRate: float, boundaryRate: float
-    ) -> List[SourcePoint]:
+    ) -> SourceMask:
         sourceWHRate = whMaxRate * np.random.rand()
         sourceWH = 2 + int(sourceWHRate * min(domainWidth, domainHeight))
 
-        centerXRate = boundaryRate + np.random.rand() * (1 - boundaryRate * 2)
-        centerX = int(domainWidth * centerXRate)
+        leftTopXRate = boundaryRate + np.random.rand() * (1 - boundaryRate * 2 - sourceWHRate)
+        leftTopX = int(domainWidth * leftTopXRate)
 
-        centerYRate = boundaryRate + np.random.rand() * (1 - boundaryRate * 2)
-        centerY = int(domainHeight * centerYRate)
+        leftTopYRate = boundaryRate + np.random.rand() * (1 - boundaryRate * 2 - sourceWHRate)
+        leftTopY = int(domainHeight * leftTopYRate)
 
-        return self.getSourcePointList(centerX, centerY, sourceWH, sourceWH)
+        return self.getSourceMask(leftTopX, leftTopY, sourceWH, sourceWH)
 
     def getSourceExpression(
         self, pointNumber: int, decay_point: int, T: int, biasRate: float
@@ -132,5 +129,16 @@ def test1():
     plt.show()
 
 
+def test2():
+    import torch, time
+
+    x = torch.arange(40000).reshape((200, 200))
+    t1 = time.time()
+    y = torch.arange(400).reshape((20, 20))
+
+    x[100:120, 100:120] = y
+    print(time.time() - t1)
+
+
 if __name__ == "__main__":
-    test1()
+    test2()

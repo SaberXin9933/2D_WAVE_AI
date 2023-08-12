@@ -38,7 +38,7 @@ class Context(object):
             logger_file_name = f"{self.log_dir}/{self.params.type}.log"
         else:
             logger_file_name = (
-                f"{self.log_dir}/{self.params.type}_{strftime('%Y%m%d_%H%M%S')}.log"
+                f"{self.log_dir}/{self.params.type}_{strftime('%Y%m%d')}.log"
             )
         self.logger = logging.getLogger(self.params.name)
         self.formatter = logging.Formatter(fmt=LOG_FMT, datefmt=LOG_DATEFMT)

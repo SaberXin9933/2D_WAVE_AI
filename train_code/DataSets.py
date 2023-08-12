@@ -9,6 +9,7 @@ from threading import Lock as TLock
 import time
 import threading
 import queue
+import numpy as np
 import time
 from Context import Context
 import os
@@ -135,33 +136,6 @@ class DataSets:
         self.rLock.release()
 
 
-def ask(datasets: DataSets, ask_queue: queue.Queue):
-    with torch.no_grad():
-        device = datasets.context.device
-        while True:
-            index_list, batchP, batchV, batchPropagation = datasets.ask()
-            ask_queue.put(
-                (
-                    index_list,
-                    batchP.to(device),
-                    batchV.to(device),
-                    batchPropagation.to(device),
-                )
-            )
-
-
-def tell(datasets: DataSets, tell_queue: queue.Queue):
-    with torch.no_grad():
-        while True:
-            index_list, batchP, batchV, batchPropagation = tell_queue.get()
-            datasets.updateData(
-                index_list,
-                batchP.detach().cpu(),
-                batchV.detach().cpu(),
-                batchPropagation.detach().cpu(),
-            )
-
-
 """测试函数"""
 
 
@@ -198,36 +172,13 @@ def train_test():
     params.batch_size = 100
     params.dataset_size = 1000
     datasets = DataSets(context)
-    ask_queue = queue.Queue()
-    tell_queue = queue.Queue()
-    wait = 0.1
 
-    t_list = []
-    for _ in range(2):
-        t = threading.Thread(target=ask, args=(datasets, ask_queue))
-        t.daemon = True
-        t_list.append(t)
-    for _ in range(2):
-        t = threading.Thread(target=tell, args=(datasets, tell_queue))
-        t.daemon = True
-        t_list.append(t)
-    for t in t_list:
-        t.start()
-
-    cost_list = []
-    for i in range(100000):
-        start_time = time.time()
-        index_list, batchP, batchV, batchPropagation = ask_queue.get()
-        time.sleep(wait)
-        tell_queue.put((index_list, batchP, batchV, batchPropagation))
-        end_time = time.time()
-        cost = end_time - start_time - wait
-        cost_list.append(cost)
-        print(i, f"ask time cost : {cost} s")
-
-    print(sum(cost_list) / len(cost_list))
-
-    print([domain.step for domain in datasets.domainList])
+    t1 = time.time()
+    for i in range(100):
+        index_list, batchP, batchV, batchPropagation = datasets.ask()
+        datasets.updateData(index_list, batchP, batchV, batchPropagation)
+    cost = time.time()-t1
+    print(cost/100)
 
 
 if __name__ == "__main__":
