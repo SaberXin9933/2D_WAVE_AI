@@ -6,7 +6,6 @@ import threading
 import queue
 import torch
 import random
-import time
 
 
 def askThread(datasets: DataSets, ask_queue: queue.Queue):
