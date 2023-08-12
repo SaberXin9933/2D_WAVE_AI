@@ -24,3 +24,15 @@ class Domain:
             sourceMask.leftTopX : sourceMask.leftTopX + sourceMask.sourceWidth,
             sourceMask.leftTopY : sourceMask.leftTopY + sourceMask.sourceHeight,
         ] = change
+
+        self.data_v[
+            0:1,
+            sourceMask.leftTopX + 1 : sourceMask.leftTopX + sourceMask.sourceWidth,
+            sourceMask.leftTopY : sourceMask.leftTopY + sourceMask.sourceHeight,
+        ] = 0
+
+        self.data_v[
+            1:2,
+            sourceMask.leftTopX : sourceMask.leftTopX + sourceMask.sourceWidth,
+            sourceMask.leftTopY + 1 : sourceMask.leftTopY + sourceMask.sourceHeight,
+        ] = 0
