@@ -67,7 +67,7 @@ class DataSets:
     def ask(self):
         retryCount = 0
         while True:
-            if retryCount > 100:
+            if retryCount > 1000:
                 self.log.error(f"ask fail,max retry times")
                 os._exit(1)
             data = self.ansycAsk()

@@ -62,7 +62,7 @@ class Params(object):
         self.n_batches_per_epoch = 10000
         self.reset_freq = 0.0003
         self.train_save_per_sample_times = 1000
-        self.ask_fail_wait_time = 0.0001
+        self.ask_fail_wait_time = 0.01
         self.batch_size = 100
         self.datasetNum = 5
         self.dataset_size: int = 600

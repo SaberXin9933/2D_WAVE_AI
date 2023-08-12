@@ -103,7 +103,7 @@ def test2():
     params.maxT = 40
     params.batch_size = 1
     params.dataset_size = 1
-    params.is_cuda = False
+    params.is_cuda = True
     params.datasetNum = 1
     context = Context(params)
 
@@ -128,7 +128,7 @@ def test2():
         )
         if i > 100:
             plt.clf()
-            plt.matshow(batchP.squeeze().numpy(), fignum=0, vmin=-1, vmax=1)
+            plt.matshow(batchP.cpu().squeeze().numpy(), fignum=0, vmin=-1, vmax=1)
             plt.colorbar()
             plt.pause(0.01)
 
