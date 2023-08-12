@@ -2,9 +2,7 @@ from Context import Context, Params
 from DatasetsManager import DatasetsManager
 from FinitDiffenceManager import FinitDiffenceManager
 from ModelManager import ModelManager
-import threading
 import torch
-import queue
 import time, os, random
 from utils.pltUtils import save_2d_tensor_fig
 from utils.torchUtils import set_num_threads, resetRandomTorchSeed
@@ -14,7 +12,6 @@ def mse(loss):
     return torch.mean(torch.pow(loss, 2), dim=(1, 2, 3))
 
 def train():
-    set_num_threads(4)
 
     params = Params()
     params.type = "train"
@@ -38,9 +35,12 @@ def train():
         # resetRandomTorchSeed()
         model.train()
         for i in range(params.n_batches_per_epoch):
+            t1 = time.time()
             data = dataManager.ask()
+            t2 = time.time()
             index_list, p_old, v_old, batchPropagation = data
             p_new, v_new = model(p_old, v_old, batchPropagation)
+            t3 = time.time()
             lossBatchP, lossBatchVX, lossBatchVY = finitDiffenceManager.physic_cf_loss(
                 p_old, v_old, p_new, v_new, batchPropagation
             )
@@ -48,9 +48,11 @@ def train():
             loss_vx = mse(lossBatchVX)
             loss_vy = mse(lossBatchVY)
             loss = torch.mean(torch.log10(loss_p + loss_vx + loss_vy))
+            t4 = time.time()
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+            t5 = time.time()
             dataManager.tell(
                 (
                     index_list,
@@ -59,9 +61,11 @@ def train():
                     batchPropagation.detach(),
                 )
             )
+            t6 = time.time()
 
             # 日志打印
             if i % 50 == 0:
+                log.info(f"{t2-t1},{t3-t2},{t4-t3},{t5-t4},{t6-t5}")
                 loss = loss.detach().cpu().numpy()
                 loss_vx = torch.mean(loss_vx).detach().cpu().numpy()
                 loss_vy = torch.mean(loss_vy).detach().cpu().numpy()
@@ -106,4 +110,6 @@ def train():
 
 
 if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.set_start_method('spawn')
     train()
