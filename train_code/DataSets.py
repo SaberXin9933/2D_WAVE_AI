@@ -26,8 +26,7 @@ class DataSets:
         self.askFailWaitTime = params.ask_fail_wait_time
 
         # 域管理类初始化
-        self.sourceManager = SourceManager(context)
-        self.domainManager = DomainManager(context, self.sourceManager)
+        self.domainManager = DomainManager(context)
 
         # 计算域数据初始化
         self.domainList = self.getDomainList(params.dataset_size)
@@ -56,7 +55,7 @@ class DataSets:
         if index > self.domainSize:
             raise RuntimeError
         domain = self.domainList[index]
-        domain.update()
+        self.domainManager.updateDomain(domain)
         return domain
 
     def askDomainListByIndexList(self, indexList: List[int]) -> List[Domain]:
@@ -93,39 +92,37 @@ class DataSets:
             self.domainList[index] for index in self.indexList[start:end]
         ]
         for domain in selected_domains:
-            domain.update()
+            self.domainManager.updateDomain(domain)
 
-        selected_data_index = [domain.index for domain in selected_domains]
+        selected_data_index_list = [domain.index for domain in selected_domains]
         selected_data_p = [domain.data_p for domain in selected_domains]
         selected_data_v = [domain.data_v for domain in selected_domains]
-        selected_data_propagation = [
-            domain.data_propagation for domain in selected_domains
-        ]
+        selected_propagation_p = [domain.propagation_p for domain in selected_domains]
+        selected_propagation_v = [domain.propagation_v for domain in selected_domains]
         return (
-            selected_data_index,
+            selected_data_index_list,
             torch.stack(selected_data_p, dim=0),
             torch.stack(selected_data_v, dim=0),
-            torch.stack(selected_data_propagation, dim=0),
+            torch.stack(selected_propagation_p, dim=0),
+            torch.stack(selected_propagation_v, dim=0),
         )
 
     """批量回写"""
 
-    def updateData(
-        self,
-        indexList: List[int],
-        batchP: torch.Tensor,
-        batchV: torch.Tensor,
-        batchPropagation: torch.Tensor,
-    ):
+    def updateData(self, data: tuple):
+        (
+            indexList,
+            batchP,
+            batchV,
+        ) = data
         for i, index in enumerate(indexList):
             if self.params.type == "train" and random.random() < self.params.reset_freq:
                 self.domainList[index] = self.domainManager.getRandomDomain(index)
                 self.log.info(f"reset_{index}")
             else:
-                domain = self.domainList[index]
+                domain: Domain = self.domainList[index]
                 domain.data_p = batchP[i]
                 domain.data_v = batchV[i]
-                domain.data_propagation = batchPropagation[i]
 
         self.rLock.acquire()
         self.writeCount += len(indexList)
@@ -148,19 +145,17 @@ def test1():
     wait = 0.1
     for i in range(N):
         start_time = time.time()
-        index_list, batchP, batchV, batchPropagation = datasets.ask()
-        batchP, batchV, batchPropagation = (
+        index_list, batchP, batchV = datasets.ask()
+        batchP, batchV = (
             batchP.cuda(),
             batchV.cuda(),
-            batchPropagation.cuda(),
         )
         time.sleep(wait)
-        batchP, batchV, batchPropagation = (
+        batchP, batchV = (
             batchP.cpu(),
             batchV.cpu(),
-            batchPropagation.cpu(),
         )
-        datasets.updateData(index_list, batchP, batchV, batchPropagation)
+        datasets.updateData(index_list, batchP, batchV)
         end_time = time.time()
         print(i, f"ask time cost : {end_time - start_time} s")
     print([domain.step for domain in datasets.domainList])
@@ -175,10 +170,11 @@ def train_test():
 
     t1 = time.time()
     for i in range(100):
-        index_list, batchP, batchV, batchPropagation = datasets.ask()
-        datasets.updateData(index_list, batchP, batchV, batchPropagation)
-    cost = time.time()-t1
-    print(cost/100)
+        print(i)
+        index_list, batchP, batchV, propagation_p, propagation_v = datasets.ask()
+        datasets.updateData((index_list, batchP, batchV))
+    cost = time.time() - t1
+    print(cost / 100)
 
 
 if __name__ == "__main__":

@@ -1,17 +1,11 @@
 import numpy as np
-from typing import List
-
-
-class SourceMask:
-    def __init__(self, leftTopX, leftTopY, sourceWidth, sourceHeight, mask) -> None:
-        self.leftTopX = leftTopX
-        self.leftTopY = leftTopY
-        self.sourceWidth = sourceWidth
-        self.sourceHeight = sourceHeight
-        self.mask = mask
 
 
 class Source:
-    def __init__(self, sourceMask: SourceMask, sourceExpression: np.array) -> None:
-        self.sourceMask: SourceMask = sourceMask
+    def __init__(self, x,y, width, height, mask, sourceExpression: np.array) -> None:
+        self.x = x
+        self.y = y
+        self.sourceWidth = width
+        self.sourceHeight = height
+        self.mask = mask
         self.sourceExpression: np.array = sourceExpression

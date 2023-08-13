@@ -13,6 +13,7 @@ from utils.torchUtils import set_num_threads, resetRandomTorchSeed
 def mse(loss):
     return torch.mean(torch.pow(loss, 2), dim=(1, 2, 3))
 
+
 def train():
     set_num_threads(4)
 
@@ -33,16 +34,17 @@ def train():
     dataManager.startAll()
     model, optimizer = modelManager.getNetAndOptimizer(params.loadIndex)
 
-
     for epoch in range(params.loadIndex + 1, params.n_epochs):
         # resetRandomTorchSeed()
         model.train()
         for i in range(params.n_batches_per_epoch):
             data = dataManager.ask()
-            index_list, p_old, v_old, batchPropagation = data
-            p_new, v_new = model(p_old, v_old, batchPropagation)
+            index_list, p_old, v_old, propagation_p, propagation_v = data
+            p_new, v_new = model(
+                torch.cat([p_old, v_old, propagation_p, propagation_v], dim=1)
+            )
             lossBatchP, lossBatchVX, lossBatchVY = finitDiffenceManager.physic_cf_loss(
-                p_old, v_old, p_new, v_new, batchPropagation
+                p_old, v_old, p_new, v_new, propagation_p, propagation_v
             )
             loss_p = mse(lossBatchP)
             loss_vx = mse(lossBatchVX)
@@ -56,7 +58,6 @@ def train():
                     index_list,
                     p_new.detach(),
                     v_new.detach(),
-                    batchPropagation.detach(),
                 )
             )
 

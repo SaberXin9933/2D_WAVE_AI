@@ -8,18 +8,17 @@ class Spinn_Wave_Model(nn.Module):
         self.hidden_size = hidden_size
         self.bilinear = bilinear
         self.residuals = residuals
-        self.conv1 = nn.Conv2d(4, hidden_size, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(6, hidden_size, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(hidden_size, 3, kernel_size=3, padding=1)
 
-    def forward(self, p_old, v_old, field_masks):
-        x = torch.cat([p_old, v_old, field_masks], dim=1)
-        x = torch.relu(self.conv1(x))
+    def forward(self, x_old):
+        x = torch.relu(self.conv1(x_old))
         x = torch.relu(self.conv2(x))
         x = self.conv3(x)
-        p_new, v_new = 4 * torch.tanh((1 / 4) * (p_old + x[:, 0:1])), 4 * torch.tanh(
-            (1 / 4) * (v_old + x[:, 1:3])
-        )
+        p_new, v_new = 4 * torch.tanh(
+            (1 / 4) * (x_old[:, 0:1] + x[:, 0:1])
+        ), 4 * torch.tanh((1 / 4) * (x_old[:, 1:3] + x[:, 1:3]))
         return p_new, v_new
 
 

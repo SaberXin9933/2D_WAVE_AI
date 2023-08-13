@@ -11,29 +11,14 @@ import time
 
 def askThread(datasets: DataSets, ask_queue: queue.Queue):
     with torch.no_grad():
-        device = datasets.context.device
         while True:
-            index_list, batchP, batchV, batchPropagation = datasets.ask()
-            ask_queue.put(
-                (
-                    index_list,
-                    batchP,
-                    batchV,
-                    batchPropagation,
-                )
-            )
+            ask_queue.put(datasets.ask())
 
 
 def tellThread(datasets: DataSets, tell_queue: queue.Queue):
     with torch.no_grad():
         while True:
-            index_list, batchP, batchV, batchPropagation = tell_queue.get()
-            datasets.updateData(
-                index_list,
-                batchP,
-                batchV,
-                batchPropagation,
-            )
+            datasets.updateData(tell_queue.get())
 
 
 def datasetsProcess(
@@ -129,24 +114,18 @@ class DatasetsManager:
                 )
 
             data = self.askByIndex(currentIndex)
-            index_list, batchP, batchV, batchPropagation = data
             self.indexQueue.put(currentIndex)
             self.askQueue.put(
-                (
-                    index_list,
-                    batchP.to(device),
-                    batchV.to(device),
-                    batchPropagation.to(device),
-                )
+                [di.to(device) if isinstance(di, torch.Tensor) else di for di in data]
             )
 
     def tellThreading(self):
         while True:
             data = self.tellQueue.get()
-            index_list, batchP, batchV, batchPropagation = data
             currentIndex = self.indexQueue.get()
             self.tellByIndex(
-                currentIndex, (index_list, batchP.cpu(), batchV.cpu(), batchPropagation.cpu())
+                currentIndex,
+                [di.cpu() if isinstance(di, torch.Tensor) else di for di in data],
             )
 
     def ask(self):
@@ -179,7 +158,7 @@ def test1():
         t2 = time.time()
         # time.sleep(0.1)
         t3 = time.time()
-        datasetManager.tell(data)
+        datasetManager.tell(data[:-2])
         t4 = time.time()
 
         print(i, t2 - t1, t4 - t3)

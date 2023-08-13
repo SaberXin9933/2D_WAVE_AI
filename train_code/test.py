@@ -40,10 +40,12 @@ model, optimizer = modelManager.getNetAndOptimizer(params.loadIndex)
 for epoch in range(params.loadIndex + 1, params.n_epochs):
     model.eval()
     for i in range(params.n_batches_per_epoch):
-        index_list, p_old, v_old, batchPropagation = datasets.ask()
-        p_new, v_new = model(p_old, v_old, batchPropagation)
+        index_list, p_old, v_old, propagation_p, propagation_v = datasets.ask()
+        p_new, v_new = model(
+            torch.cat([p_old, v_old, propagation_p, propagation_v], dim=1)
+        )
         lossBatchP, lossBatchVX, lossBatchVY = finitDiffenceManager.physic_cf_loss(
-            p_old, v_old, p_new, v_new, batchPropagation
+            p_old, v_old, p_new, v_new, propagation_p, propagation_v
         )
         loss_p = mse(lossBatchP)
         loss_vx = mse(lossBatchVX)
@@ -52,7 +54,7 @@ for epoch in range(params.loadIndex + 1, params.n_epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        datasets.updateData(index_list, p_new.detach().clone(), v_new.detach().clone(), batchPropagation.detach().clone())
+        datasets.updateData((index_list, p_new.detach().clone(), v_new.detach().clone()))
 
         loss = loss.detach().cpu().numpy()
         loss_vx = torch.mean(loss_vx).detach().cpu().numpy()
