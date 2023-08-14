@@ -26,6 +26,7 @@ def datasetsProcess(
     ask_queue: Queue,
     tell_queue: Queue,
 ):
+    torch.set_num_threads(4)
     context = Context(params)
     datasets = DataSets(context)
     threading_list = []

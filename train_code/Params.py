@@ -48,6 +48,7 @@ class Params(object):
         """
         self.is_cuda = False
         self.dtype = torch.float32
+        self.device_num = 1
 
         """
         上下文配置
@@ -65,7 +66,7 @@ class Params(object):
         self.reset_freq = 0.0003
         self.train_save_per_sample_times = 1000
         self.ask_fail_wait_time = 0.01
-        self.batch_size = 10
+        self.batch_size = 100
         self.datasetNum = 5
         self.dataset_size: int = 600
 

@@ -77,7 +77,7 @@ class Context(object):
             if not torch.cuda.is_available():
                 self.logger.error("cuda didnt find gpu!!!,please check the device")
                 raise RuntimeError
-            device_num = 0
+            device_num = self.params.device_num
             os.environ["CUDA_VISIVLE_DEVICES"] = f"{device_num}"
             torch.cuda.set_device(device_num)
             self.device = torch.device(f"cuda:{device_num}")
