@@ -48,7 +48,7 @@ class Params(object):
         """
         self.is_cuda = False
         self.dtype = torch.float32
-        self.device_num = 1
+        self.device_num = 0
 
         """
         上下文配置

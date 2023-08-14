@@ -56,9 +56,9 @@ class DomainManager:
         domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
         domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
 
-        domain.data_p += self.getRandomField() * 0.1
-        domain.data_v[0:1] += self.getRandomField() * 0.1
-        domain.data_v[1:2] += self.getRandomField() * 0.1
+        domain.data_p += self.getRandomField() * 0.01
+        domain.data_v[0:1] += self.getRandomField() * 0.01
+        domain.data_v[1:2] += self.getRandomField() * 0.01
 
         domain.base_propagation = self.getPMLField().to(self.dytpe)
         domain.sourceList = self.sourceManager.getRandomSourceList()

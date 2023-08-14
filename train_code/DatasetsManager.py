@@ -26,7 +26,7 @@ def datasetsProcess(
     ask_queue: Queue,
     tell_queue: Queue,
 ):
-    torch.set_num_threads(4)
+    torch.set_num_threads(2)
     context = Context(params)
     datasets = DataSets(context)
     threading_list = []
@@ -86,11 +86,9 @@ class DatasetsManager:
         threading_list = []
         for _ in range(1):
             t = threading.Thread(target=self.askThreading)
-            t.daemon = True
             threading_list.append(t)
         for _ in range(1):
             t = threading.Thread(target=self.tellThreading)
-            t.daemon = True
             threading_list.append(t)
         for t in threading_list:
             t.start()
