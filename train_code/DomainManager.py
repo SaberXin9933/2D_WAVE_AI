@@ -41,17 +41,43 @@ class DomainManager:
         )
         data = (1000 + data / torch.max(data)) / 1000
         data /= torch.max(data)
-        # return data.to(self.dytpe).unsqueeze(0) * self.getPMLField()
-        return self.getPMLField()
+        return data.to(self.dytpe).unsqueeze(0)
 
-    """获取随机计算域"""
+    """获取计算域"""
+
+    def getDomain(self, index: int) -> Domain:
+        params = self.params
+        if params.type == "test" and params.testIsRandom == True:
+            return self.getSpecifiedDomain(index)
+        else:
+            return self.getRandomDomain(index)
 
     def getRandomDomain(self, index: int) -> Domain:
         domain = Domain(index)
         domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
         domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
-        domain.base_propagation = self.getRandomField().to(self.dytpe)
-        domain.source = self.sourceManager.getRandomSouce()
+        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.sourceList = self.sourceManager.getRandomSourceList()
+        domain.propagation_p = None
+        domain.propagation_v = None
+        return domain
+
+    def getSpecifiedDomain(self, index: int) -> Domain:
+        params = self.params
+        testPointNumber = params.testPointNumber
+        testSourceParamsList = params.testSourceParamsList
+
+        domain = Domain(index)
+        domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
+        domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
+        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.sourceList = []
+        for sourceParams in params.testSourceParamsList:
+            testT, testBias, testSourceX, testSourceY, testSourceWH = sourceParams
+            source = self.sourceManager.getSourceBySet(
+                testT, testBias, testSourceX, testSourceY, testSourceWH
+            )
+            domain.sourceList.append(source)
         domain.propagation_p = None
         domain.propagation_v = None
         return domain
@@ -60,38 +86,35 @@ class DomainManager:
 
     def updateDomain(self, domain: Domain):
         domain.step += 1
-        source = domain.source
-        sx = source.x
-        sy = source.y
-        sw = source.sourceWidth
-        sh = source.sourceHeight
-        mask: torch.Tensor = source.mask
-        # update source
-        sourceExpression = domain.source.sourceExpression
-        change = sourceExpression[domain.step % len(sourceExpression)]
-        domain.data_p[
-            :,
-            sx : sx + sw,
-            sy : sy + sh,
-        ] += mask * (
-            change
-            - domain.data_p[
-                :,
-                sx : sx + sw,
-                sy : sy + sh,
-            ]
-        )
         # update propagation field
         domain.propagation_p = domain.base_propagation.clone()
         domain.propagation_v = torch.cat([domain.base_propagation] * 2, dim=0)
-
-        domain.propagation_p[0:1, sx : sx + sw, sy : sy + sh] = (mask != 1.0).float()
-        domain.propagation_v[0:1, sx : sx + sw, sy : sy + sh] = (
-            self.derivatives.mean_top(mask) != 1.0
-        ).float()
-        domain.propagation_v[1:2, sx : sx + sw, sy : sy + sh] = (
-            self.derivatives.mean_left(mask) != 1.0
-        ).float()
+        for source in domain.sourceList:
+            sx = source.x
+            sy = source.y
+            sw = source.sourceWidth
+            sh = source.sourceHeight
+            mask: torch.Tensor = source.mask
+            # update source
+            sourceExpression = source.sourceExpression
+            change = sourceExpression[domain.step % len(sourceExpression)]
+            domain.data_p[:, sx : sx + sw, sy : sy + sh,] += mask * (
+                change
+                - domain.data_p[
+                    :,
+                    sx : sx + sw,
+                    sy : sy + sh,
+                ]
+            )
+            domain.propagation_p[0:1, sx : sx + sw, sy : sy + sh] = (
+                mask != 1.0
+            ).float()
+            domain.propagation_v[0:1, sx : sx + sw, sy : sy + sh] = (
+                self.derivatives.mean_top(mask) != 1.0
+            ).float()
+            domain.propagation_v[1:2, sx : sx + sw, sy : sy + sh] = (
+                self.derivatives.mean_left(mask) != 1.0
+            ).float()
 
     """获取PML层"""
 
@@ -134,10 +157,10 @@ def test1():
     params.maxBiasRate = 0.7
     context = Context(params)
     domainManager = DomainManager(context)
-    domain = domainManager.getRandomDomain(index)
+    domain = domainManager.getDomain(index)
     domainManager.updateDomain(domain)
     plt.matshow(domain.propagation_v[0].squeeze().numpy())
-    plt.colorbar()     
+    plt.colorbar()
     plt.show()
 
 

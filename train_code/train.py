@@ -6,7 +6,7 @@ import threading
 import torch
 import queue
 import time, os, random
-from utils.pltUtils import save_2d_tensor_fig
+from utils.pltUtils import predictPlot
 from utils.torchUtils import set_num_threads, resetRandomTorchSeed
 
 
@@ -63,16 +63,16 @@ def train():
 
             # 日志打印
             if i % 50 == 0:
-                loss = loss.detach().cpu().numpy()
-                loss_vx = torch.mean(loss_vx).detach().cpu().numpy()
-                loss_vy = torch.mean(loss_vy).detach().cpu().numpy()
-                loss_p = torch.mean(loss_p).detach().cpu().numpy()
+                loss_mean = loss.detach().cpu().numpy()
+                loss_vx_mean = torch.mean(loss_vx).detach().cpu().numpy()
+                loss_vy_mean = torch.mean(loss_vy).detach().cpu().numpy()
+                loss_p_mean = torch.mean(loss_p).detach().cpu().numpy()
                 msg = (
                     f"epoch:{epoch},index:{i};"
-                    + f" loss : {loss};"
-                    + f" loss_vx : {loss_vx};"
-                    + f" loss_vy : {loss_vy};"
-                    + f" loss_p : {loss_p};"
+                    + f" loss : {loss_mean};"
+                    + f" loss_vx : {loss_vx_mean};"
+                    + f" loss_vy : {loss_vy_mean};"
+                    + f" loss_p : {loss_p_mean};"
                 )
                 log.info(msg)
 
@@ -81,21 +81,36 @@ def train():
                 tbWriter.add_scalar(
                     "loss", loss.item(), epoch * params.n_batches_per_epoch + i
                 )
+                tbWriter.add_scalar(
+                    "loss_p", torch.mean(loss_p), epoch * params.n_batches_per_epoch + i
+                )
+                tbWriter.add_scalar(
+                    "loss_vx",
+                    torch.mean(loss_vx),
+                    epoch * params.n_batches_per_epoch + i,
+                )
+                tbWriter.add_scalar(
+                    "loss_vy",
+                    torch.mean(loss_vy),
+                    epoch * params.n_batches_per_epoch + i,
+                )
 
             # 训练过程图片存储
             if i % params.train_save_per_sample_times == 0:
                 save_index = random.choice(range(len(index_list)))
-                save_2d_tensor_fig(
-                    f"{img_dir}/train_{i // params.train_save_per_sample_times}_p.png",
-                    p_old[save_index].squeeze().detach().cpu().numpy(),
+                save_path = (
+                    f"{img_dir}/train_{i // params.train_save_per_sample_times}_p.png"
                 )
-                save_2d_tensor_fig(
-                    f"{img_dir}/train_{i // params.train_save_per_sample_times}_vx.png",
-                    v_old[save_index, 0].squeeze().detach().cpu().numpy(),
-                )
-                save_2d_tensor_fig(
-                    f"{img_dir}/train_{i // params.train_save_per_sample_times}_vy.png",
-                    v_old[save_index, 1].squeeze().detach().cpu().numpy(),
+
+                predictPlot(
+                    p_old[save_index].detach().squeeze().cpu().numpy(),
+                    v_old[save_index, 0:1].detach().squeeze().cpu().numpy(),
+                    v_old[save_index, 1:2].detach().squeeze().cpu().numpy(),
+                    lossBatchP[save_index].detach().squeeze().cpu().numpy(),
+                    lossBatchVX[save_index].detach().squeeze().cpu().numpy(),
+                    lossBatchVY[save_index].detach().squeeze().cpu().numpy(),
+                    pauseTime=-2,
+                    savePath=save_path,
                 )
                 log.info(
                     f"save train img success,save path:{img_dir}/train_{i // params.train_save_per_sample_times}_XXX.png"
@@ -108,5 +123,6 @@ def train():
 
 if __name__ == "__main__":
     import multiprocessing
+
     multiprocessing.set_start_method("spawn")
     train()

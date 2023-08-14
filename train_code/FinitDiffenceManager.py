@@ -65,15 +65,20 @@ class FinitDiffenceManager:
 def test1():
     from DatasetsManager import DatasetsManager, Params
     from matplotlib import pyplot as plt
+    from utils.pltUtils import predictPlot
 
+    vmin = None
+    vmax = None
     params = Params()
     params.kernel_point_number = 4
     params.minT = 15
     params.maxT = 40
     params.batch_size = 1
     params.dataset_size = 1
-    params.is_cuda = True
+    params.is_cuda = False
     params.datasetNum = 1
+    params.type = "test"
+    params.testIsRandom = True
     context = Context(params)
 
     finitDiffenceManager = FinitDiffenceManager(context)
@@ -97,13 +102,16 @@ def test1():
             torch.mean(loss_vx**2),
             torch.mean(loss_vy**2),
         )
-        if i > 100:
-            plt.clf()
-            plt.matshow(
-                batchV[:, 1:2].cpu().squeeze().numpy(), fignum=0, vmin=-1, vmax=1
+        if i % 50 == 0:
+            predictPlot(
+                batchP[:, 0:1].detach().squeeze().cpu().numpy(),
+                batchV[:, 0:1].detach().squeeze().cpu().numpy(),
+                batchV[:, 1:2].detach().squeeze().cpu().numpy(),
+                loss_p.detach().squeeze().cpu().numpy(),
+                loss_vx.detach().squeeze().cpu().numpy(),
+                loss_vy.detach().squeeze().cpu().numpy(),
+                0.1,
             )
-            plt.colorbar()
-            plt.pause(0.01)
 
 
 if __name__ == "__main__":

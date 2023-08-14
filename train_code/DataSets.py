@@ -42,7 +42,7 @@ class DataSets:
         self.log.info("domain generate start...")
         domainList = []
         for index in range(domainSize):
-            domain = self.domainManager.getRandomDomain(index)
+            domain = self.domainManager.getDomain(index)
             domainList.append(domain)
             if index != 0 and (10 * index) % domainSize == 0:
                 self.log.info(f"domain has generate {100*index/(domainSize)}%")
@@ -117,7 +117,7 @@ class DataSets:
         ) = data
         for i, index in enumerate(indexList):
             if self.params.type == "train" and random.random() < self.params.reset_freq:
-                self.domainList[index] = self.domainManager.getRandomDomain(index)
+                self.domainList[index] = self.domainManager.getDomain(index)
                 self.log.info(f"reset_{index}")
             else:
                 domain: Domain = self.domainList[index]

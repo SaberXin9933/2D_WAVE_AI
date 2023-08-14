@@ -4,58 +4,102 @@ from Source import Source
 from Context import Context
 from typing import List
 from utils.mathUtils import sigmodNP
+import random
 
 
 class SourceManager:
     def __init__(self, context: Context) -> None:
         self.context = context
-        self.params = params = context.params
+        self.log = context.logger
+        params = context.params
         self.domainWidth = params.domainWidth
         self.domainHeight = params.domainHeight
-        self.whRate = params.whRate
-        self.boundaryRate = params.boundaryRate
+        self.boundaryWH = params.boundaryWH
+        self.propagationWidth = params.domainWidth - 2 * params.boundaryWH
+        self.propagationHeight = params.domainHeight - 2 * params.boundaryWH
         self.pointNumber = params.pointNumber
         self.decay_point = params.decay_point
         self.minT = params.minT
         self.maxT = params.maxT
         self.minBiasRate = params.minBiasRate
         self.maxBiasRate = params.maxBiasRate
+        self.minSouceWH = params.minSouceWH
+        self.maxSouceWH = params.maxSouceWH
+        self.cellWH = params.cellWH
+        self.maxSourceNum = params.maxSourceNum
         self.dtype = params.dtype
 
-    def getRandomSouce(self) -> Source:
-        x, y, sourceWH, mask = self.getRandomMask()
-        sourceExpression = self.getRandomSourceExpression(
-            self.pointNumber,
-            self.decay_point,
-            self.minT,
-            self.maxT,
-            self.minBiasRate,
-            self.maxBiasRate,
+        self.initPartition()
+
+    """传播域分区"""
+
+    def initPartition(self):
+        # 计算传播域分区信息
+        pw = self.propagationWidth
+        ph = self.propagationHeight
+        cellWH = self.cellWH
+        boundaryWH = self.boundaryWH
+
+        w_partition_times = pw // cellWH
+        h_partition_times = ph // cellWH
+
+        partition_result = []
+        for i in range(w_partition_times):
+            for j in range(h_partition_times):
+                x = i * cellWH + boundaryWH
+                y = j * cellWH + boundaryWH
+                w = pw - i * cellWH if i == w_partition_times - 1 else cellWH
+                h = ph - j * cellWH if j == h_partition_times - 1 else cellWH
+                partition_result.append((x, y, w, h))
+        self.maxSourceNum = min(len(partition_result), self.maxSourceNum)
+        self.partition_result = partition_result
+
+    """获取源项"""
+
+    def getSourceBySet(self, T, biasRate, sourceX, sourcepY, sourceWH):
+        sourceExpression = self.getSourceExpression(
+            pointNumber=self.pointNumber,
+            decay_point=self.decay_point,
+            T=T,
+            biasRate=biasRate,
         )
-
-        return Source(x, y, sourceWH, sourceWH, mask, sourceExpression)
-
-    """
-    掩码
-    """
-
-    def getRandomMask(self) -> tuple:
-        sourceWHRate = self.whRate * np.random.rand()
-        sourceWH = 2 + int(sourceWHRate * min(self.domainWidth, self.domainHeight))
-
-        leftTopXRate = self.boundaryRate + np.random.rand() * (
-            1 - self.boundaryRate * 2 - self.whRate
-        )
-        leftTopX = int(self.domainWidth * leftTopXRate)
-
-        leftTopYRate = self.boundaryRate + np.random.rand() * (
-            1 - self.boundaryRate * 2 - self.whRate
-        )
-        leftTopY = int(self.domainHeight * leftTopYRate)
-
         mask = torch.ones(1, sourceWH, sourceWH)
+        return Source(sourceX, sourcepY, sourceWH, sourceWH, mask, sourceExpression)
 
-        return (leftTopX, leftTopY, sourceWH, mask)
+    def getRandomSourceList(self, sourceNum: int = None) -> List[Source]:
+        sourceNum = random.randint(1, self.maxSourceNum)
+        if self.maxSourceNum < sourceNum:
+            self.log.error(
+                f"声源点数量超出范围,已经调整为最大声源数量,PRE:{sourceNum},NOW:{self.maxSourceNum}"
+            )
+            sourceNum = self.maxSourceNum
+
+        partitionList = random.sample(self.partition_result, sourceNum)
+        sourceList = []
+        for partition in partitionList:
+            sourceExpression = self.getRandomSourceExpression()
+            cellX, cellY, cellW, cellH = partition
+            sourceX, sourcepY, sourceWH = self.getSourceDistribution(
+                cellX, cellY, cellW, cellH
+            )
+            mask = torch.ones(1, sourceWH, sourceWH)
+            source = Source(
+                sourceX, sourcepY, sourceWH, sourceWH, mask, sourceExpression
+            )
+            sourceList.append(source)
+        return sourceList
+
+    """分配声源位置"""
+
+    def getSourceDistribution(self, cellX, cellY, cellW, cellH) -> tuple:
+        maxSouceWH = self.maxSouceWH
+        minSouceWH = self.minSouceWH
+        sourceWH = random.randint(minSouceWH, maxSouceWH)
+
+        leftTopX = cellX + random.randint(0, cellW - sourceWH)
+        leftTopY = cellY + random.randint(0, cellH - sourceWH)
+
+        return (leftTopX, leftTopY, sourceWH)
 
     """
     表达式
@@ -84,19 +128,20 @@ class SourceManager:
 
     def getRandomSourceExpression(
         self,
-        pointNumber: int,
-        decay_point: int,
-        minT: int,
-        maxT: int,
-        minBiasRate: int,
-        maxBiasRate: int,
     ) -> np.array:
-        T = np.random.randint(minT, maxT)
-        biasRate = minBiasRate + np.random.rand() * (maxBiasRate - minBiasRate)
+        T = np.random.randint(self.minT, self.maxT)
+        biasRate = self.minBiasRate + np.random.rand() * (
+            self.maxBiasRate - self.minBiasRate
+        )
         return self.getSourceExpression(
-            pointNumber=pointNumber, decay_point=decay_point, T=T, biasRate=biasRate
+            pointNumber=self.pointNumber,
+            decay_point=self.decay_point,
+            T=T,
+            biasRate=biasRate,
         )
 
+
+"""测试"""
 
 # 测试随机声源
 def test1():
@@ -104,18 +149,11 @@ def test1():
     from Context import Params
 
     params = Params()
-    params.domainWidth = 200
-    params.domainHeight = 200
-    params.whRate = 0.07
-    params.boundaryRate = 0.2
-    params.pointNumber = 100
-    params.minT = 20
-    params.maxT = 100
-    params.minBiasRate = 0.3
-    params.maxBiasRate = 0.7
     context = Context(params)
-    sourceManager = SourceManager(context)
-    source: Source = sourceManager.getRandomSouce()
+    sourceManger = SourceManager(context)
+    sourceList = sourceManger.getRandomSourceList(150)
+    source = sourceList[0]
+    print(sourceList)
 
     # plt.matshow(source.sourceMask)
     # plt.colorbar()
@@ -126,17 +164,10 @@ def test1():
     plt.tight_layout()  # This helps prevent overlapping of subplots
     plt.show()
 
-
-def test2():
-    import torch, time
-
-    x = torch.arange(40000).reshape((200, 200))
-    t1 = time.time()
-    y = torch.arange(400).reshape((20, 20))
-
-    x[100:120, 100:120] = y
-    print(time.time() - t1)
+    plt.matshow(source.mask.squeeze().cpu().numpy())
+    plt.colorbar()
+    plt.show()
 
 
 if __name__ == "__main__":
-    test2()
+    test1()

@@ -85,9 +85,11 @@ class DatasetsManager:
         threading_list = []
         for _ in range(1):
             t = threading.Thread(target=self.askThreading)
+            t.daemon = True
             threading_list.append(t)
         for _ in range(1):
             t = threading.Thread(target=self.tellThreading)
+            t.daemon = True
             threading_list.append(t)
         for t in threading_list:
             t.start()
