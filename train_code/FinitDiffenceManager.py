@@ -74,6 +74,7 @@ def test1():
     params.minT = 15
     params.maxT = 40
     params.batch_size = 1
+    params.datasetNum = 1
     params.dataset_size = 1
     params.is_cuda = False
     params.datasetNum = 1
