@@ -39,7 +39,6 @@ class DomainManager:
             * 3
             + 0.01 * y_mesh * np.cos(t * 0.0215)
         )
-        data = (1000 + data / torch.max(data)) / 1000
         data /= torch.max(data)
         return data.to(self.dytpe).unsqueeze(0)
 
@@ -47,7 +46,7 @@ class DomainManager:
 
     def getDomain(self, index: int) -> Domain:
         params = self.params
-        if params.type == "test" and params.testIsRandom == True:
+        if params.type == "test" and params.testIsRandom == False:
             return self.getSpecifiedDomain(index)
         else:
             return self.getRandomDomain(index)
@@ -56,6 +55,11 @@ class DomainManager:
         domain = Domain(index)
         domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
         domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
+
+        domain.data_p += self.getRandomField() * 0.1
+        domain.data_v[0:1] += self.getRandomField() * 0.1
+        domain.data_v[1:2] += self.getRandomField() * 0.1
+
         domain.base_propagation = self.getPMLField().to(self.dytpe)
         domain.sourceList = self.sourceManager.getRandomSourceList()
         domain.propagation_p = None
