@@ -70,6 +70,7 @@ def predictPlot(p, vx, vy, loss_p, loss_vx, loss_vy, pauseTime=-1, savePath: str
             vmax=1.0,
             title="p",
             plotType="matshow",
+            cmap="RdBu_r",
         )
     )
     plot_list.append(
@@ -79,6 +80,7 @@ def predictPlot(p, vx, vy, loss_p, loss_vx, loss_vy, pauseTime=-1, savePath: str
             vmax=1.0,
             title="vx",
             plotType="matshow",
+            cmap="RdBu_r",
         )
     )
     plot_list.append(
@@ -88,27 +90,22 @@ def predictPlot(p, vx, vy, loss_p, loss_vx, loss_vy, pauseTime=-1, savePath: str
             vmax=1.0,
             title="vy",
             plotType="matshow",
+            cmap="RdBu_r",
         )
     )
     plot_list.append(
         makePlotArgs(
-            Z=loss_p,
-            title="loss p",
-            plotType="matshow",
+            Z=loss_p, title="loss p", plotType="matshow", cmap="RdBu_r", origin="lower"
         )
     )
     plot_list.append(
         makePlotArgs(
-            Z=loss_vx,
-            title="loss vx",
-            plotType="matshow",
+            Z=loss_vx, title="loss vx", plotType="matshow", cmap="RdBu_r", origin="lower"
         )
     )
     plot_list.append(
         makePlotArgs(
-            Z=loss_vy,
-            title="loss vy",
-            plotType="matshow",
+            Z=loss_vy, title="loss vy", plotType="matshow", cmap="RdBu_r", origin="lower"
         )
     )
     plot_figs(plot_list, pauseTime=pauseTime, savePath=savePath)

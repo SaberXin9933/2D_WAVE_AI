@@ -1,6 +1,7 @@
 from Context import Context
 from Derivatives import Derivatives
 import torch
+from typing import List
 
 
 class FinitDiffenceManager:
@@ -9,7 +10,7 @@ class FinitDiffenceManager:
         context: Context,
     ):
         self.params = context.params
-        self.derivative = self.derivatives = Derivatives(
+        self.derivative = Derivatives(
             self.params.kernel_point_number,
             self.params.kernel_order,
             self.params.kernel_delta,
@@ -61,6 +62,42 @@ class FinitDiffenceManager:
 
         return lossBatchP, lossBatchVX, lossBatchVY
 
+    """
+    获取源项周围点的坐标
+    """
+
+    def getPointAroundSource(self, mask: torch.Tensor) -> List[tuple]:
+        mask = (mask == 0).float() * (
+            self.derivative.mean_xy(mask.unsqueeze(0).unsqueeze(1)).squeeze() > 0
+        ).float()
+        neighbor_offsets = [(-1, 0), (0, 1), (1, 0), (0, -1)]
+        # 存储值为1的区域周围的点的绝对坐标
+        neighbor_coordinates = set()
+        row_indices, col_indices = torch.where(mask == 1)
+        for x, y in zip(row_indices, col_indices):
+            neighbor_coordinates.add((int(x), int(y)))
+
+        coordinatesSortByAround = []
+        row, col = neighbor_coordinates.pop()
+        while row != None and col != None:
+            coordinatesSortByAround.append((row, col))
+            for offset_r, offset_c in neighbor_offsets:
+                new_r, new_c = row + offset_r, col + offset_c
+                if (new_r, new_c) in neighbor_coordinates:
+                    row, col = new_r, new_c
+                    neighbor_coordinates.remove((new_r, new_c))
+                    break
+            else:
+                row, col = None, None
+        return coordinatesSortByAround
+
+    def getSourceSurroundingsValue(self, v: torch.Tensor, mask: torch.Tensor):
+        mask = (mask == 0).float().squeeze()
+        v = v.squeeze()
+        # 获取起始点
+        neighbor_coordinates_list = self.getPointAroundSource(mask.clone())
+        return [v[x, y] for x, y in neighbor_coordinates_list]
+
 
 def test1():
     from DatasetsManager import DatasetsManager, Params
@@ -79,7 +116,7 @@ def test1():
     params.is_cuda = False
     params.datasetNum = 1
     params.type = "test"
-    params.testIsRandom = True
+    params.testIsRandom = False
     context = Context(params)
 
     finitDiffenceManager = FinitDiffenceManager(context)
@@ -115,5 +152,37 @@ def test1():
             )
 
 
+def test2():
+    from DatasetsManager import DataSets, Params
+    from matplotlib import pyplot as plt
+    from utils.pltUtils import predictPlot, makePlotArgs, plot_figs
+
+    vmin = None
+    vmax = None
+    params = Params()
+    params.kernel_point_number = 4
+    params.minT = 15
+    params.maxT = 40
+    params.batch_size = 1
+    params.datasetNum = 1
+    params.dataset_size = 1
+    params.is_cuda = False
+    params.datasetNum = 1
+    params.type = "test"
+    params.testIsRandom = False
+    context = Context(params)
+
+    finitDiffenceManager = FinitDiffenceManager(context)
+    dataSets = DataSets(context)
+    data = dataSets.ask()
+    index_list, batchP, batchV, propagation_p, propagation_v = data
+    p_around = finitDiffenceManager.getSourceSurroundingsValue(
+        batchP, propagation_p
+    )
+
+    x = [i for i in range(len(p_around))]
+    data1 = makePlotArgs(x,p_around, title="p around", plotType="plot")
+    plot_figs([data1], -1)
+
 if __name__ == "__main__":
-    test1()
+    test2()
