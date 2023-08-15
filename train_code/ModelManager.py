@@ -55,7 +55,7 @@ class ModelManager:
         optimizer = self.getOptimizer(model)
         if index != None and index >= 0:
             PATH = f"{self.context.model_dir}/{index}.pth"
-            checkpoint = torch.load(PATH)
+            checkpoint = torch.load(PATH, map_location=f"cuda:{self.params.device_num}")
 
             model.load_state_dict(checkpoint["model_state_dict"])
             optimizer.load_state_dict(checkpoint["optimizer_state_dict"])

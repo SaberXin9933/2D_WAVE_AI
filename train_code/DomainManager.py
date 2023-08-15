@@ -5,6 +5,7 @@ from SourceManager import SourceManager
 from FinitDiffenceManager import FinitDiffenceManager
 from Derivatives import Derivatives
 from Context import Context, Params
+import random
 
 
 class DomainManager:
@@ -44,26 +45,43 @@ class DomainManager:
 
     """获取计算域"""
 
-    def getDomain(self, index: int) -> Domain:
+    def getDomain(self, index: int, domainType: str = None) -> Domain:
         params = self.params
         if params.type == "test" and params.testIsRandom == False:
             return self.getSpecifiedDomain(index)
         else:
-            return self.getRandomDomain(index)
+            if domainType == None:
+                domainType = random.sample(self.params.env_types, 1)[0]
+            if domainType == "simple":
+                return self.getSimpleDomain(index)
+            elif domainType == "random":
+                return self.getRandomDomain(index)
+            else:
+                raise RuntimeError
 
-    def getRandomDomain(self, index: int) -> Domain:
+    def getSimpleDomain(self, index: int, sourceNum: int = None) -> Domain:
         domain = Domain(index)
+        domain.type = "simple"
         domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
         domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
 
-        domain.data_p += self.getRandomField() * 0.01
-        domain.data_v[0:1] += self.getRandomField() * 0.01
-        domain.data_v[1:2] += self.getRandomField() * 0.01
+        domain.data_p += self.getRandomField() * 0.05
+        domain.data_v[0:1] += self.getRandomField() * 0.05
+        domain.data_v[1:2] += self.getRandomField() * 0.05
 
         domain.base_propagation = self.getPMLField().to(self.dytpe)
-        domain.sourceList = self.sourceManager.getRandomSourceList()
-        domain.propagation_p = None
-        domain.propagation_v = None
+        domain.sourceList = self.sourceManager.getRandomSourceList(sourceNum)
+        return domain
+
+    def getRandomDomain(self, index: int) -> Domain:
+        domain = Domain(index)
+        domain.type = "random"
+        domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
+        domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
+        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.sourceList = None
+        domain.propagation_p = domain.base_propagation.clone()
+        domain.propagation_v = torch.cat([domain.base_propagation] * 2, dim=0)
         return domain
 
     def getSpecifiedDomain(self, index: int) -> Domain:
@@ -82,15 +100,11 @@ class DomainManager:
                 testT, testBias, testSourceX, testSourceY, testSourceWH
             )
             domain.sourceList.append(source)
-        domain.propagation_p = None
-        domain.propagation_v = None
         return domain
 
     """更新计算域"""
 
-    def updateDomain(self, domain: Domain):
-        domain.step += 1
-        # update propagation field
+    def updateDomainP(self, domain: Domain):
         domain.propagation_p = domain.base_propagation.clone()
         domain.propagation_v = torch.cat([domain.base_propagation] * 2, dim=0)
         for source in domain.sourceList:
@@ -102,7 +116,11 @@ class DomainManager:
             # update source
             sourceExpression = source.sourceExpression
             change = sourceExpression[domain.step % len(sourceExpression)]
-            domain.data_p[:, sx : sx + sw, sy : sy + sh,] += mask * (
+            domain.data_p[
+                :,
+                sx : sx + sw,
+                sy : sy + sh,
+            ] += mask * (
                 change
                 - domain.data_p[
                     :,
@@ -110,6 +128,14 @@ class DomainManager:
                     sy : sy + sh,
                 ]
             )
+
+    def updatePropagation(self, domain: Domain):
+        for source in domain.sourceList:
+            sx = source.x
+            sy = source.y
+            sw = source.sourceWidth
+            sh = source.sourceHeight
+            mask: torch.Tensor = source.mask
             domain.propagation_p[0:1, sx : sx + sw, sy : sy + sh] = (
                 mask != 1.0
             ).float()
@@ -119,6 +145,31 @@ class DomainManager:
             domain.propagation_v[1:2, sx : sx + sw, sy : sy + sh] = (
                 self.derivatives.mean_left(mask) != 1.0
             ).float()
+
+    def updateRandomDomain(self, domain: Domain):
+        domain.data_p[:] = 0
+        domain.data_v[:] = 0
+        domain.data_p += self.getRandomField() * (domain.base_propagation)
+        domain.data_v[0:1] += self.getRandomField() * domain.base_propagation
+        domain.data_v[1:2] += self.getRandomField() * domain.base_propagation
+        domain.propagation_p[:] = (
+            torch.abs(self.getRandomField()) * domain.base_propagation
+        )
+        domain.propagation_v[0:1] = (
+            torch.abs(self.getRandomField()) * domain.base_propagation
+        )
+        domain.propagation_v[1:2] = (
+            torch.abs(self.getRandomField()) * domain.base_propagation
+        )
+
+    def updateDomain(self, domain: Domain):
+        domain.step += 1
+        # update propagation field
+        if domain.type == "random":
+            self.updateRandomDomain(domain)
+        else:
+            self.updateDomainP(domain)
+            self.updatePropagation(domain)
 
     """获取PML层"""
 
@@ -191,4 +242,4 @@ def test3():
 
 
 if __name__ == "__main__":
-    test1()
+    test2()

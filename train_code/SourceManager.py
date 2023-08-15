@@ -67,7 +67,9 @@ class SourceManager:
         return Source(sourceX, sourcepY, sourceWH, sourceWH, mask, sourceExpression)
 
     def getRandomSourceList(self, sourceNum: int = None) -> List[Source]:
-        sourceNum = random.randint(1, self.maxSourceNum)
+        sourceNum = (
+            sourceNum if sourceNum != None else random.randint(1, self.maxSourceNum)
+        )
         if self.maxSourceNum < sourceNum:
             self.log.error(
                 f"声源点数量超出范围,已经调整为最大声源数量,PRE:{sourceNum},NOW:{self.maxSourceNum}"
@@ -142,6 +144,7 @@ class SourceManager:
 
 
 """测试"""
+
 
 # 测试随机声源
 def test1():

@@ -99,6 +99,10 @@ class FinitDiffenceManager:
         return [v[x, y] for x, y in neighbor_coordinates_list]
 
 
+"""测试代码"""
+
+
+# 基础差分迭代测试
 def test1():
     from DatasetsManager import DatasetsManager, Params
     from matplotlib import pyplot as plt
@@ -116,7 +120,8 @@ def test1():
     params.is_cuda = False
     params.datasetNum = 1
     params.type = "test"
-    params.testIsRandom = False
+    params.testIsRandom = True
+    params.env_types = ["random"]
     context = Context(params)
 
     finitDiffenceManager = FinitDiffenceManager(context)
@@ -152,6 +157,7 @@ def test1():
             )
 
 
+# 源项周围点值获取测试
 def test2():
     from DatasetsManager import DataSets, Params
     from matplotlib import pyplot as plt
@@ -169,20 +175,26 @@ def test2():
     params.is_cuda = False
     params.datasetNum = 1
     params.type = "test"
-    params.testIsRandom = False
+    params.testIsRandom = True
     context = Context(params)
 
     finitDiffenceManager = FinitDiffenceManager(context)
     dataSets = DataSets(context)
-    data = dataSets.ask()
-    index_list, batchP, batchV, propagation_p, propagation_v = data
-    p_around = finitDiffenceManager.getSourceSurroundingsValue(
-        batchP, propagation_p
-    )
+    for i in range(50):
+        data = dataSets.ask()
+        index_list, batchP, batchV, propagation_p, propagation_v = data
+        # batchPropagation = torch.ones_like(batchPropagation)
+        newP, newV = finitDiffenceManager.cf_step(
+            batchP, batchV, propagation_p, propagation_v
+        )
+        dataSets.updateData((index_list, newP, newV))
+    p_around = finitDiffenceManager.getSourceSurroundingsValue(batchP, propagation_p)
 
     x = [i for i in range(len(p_around))]
-    data1 = makePlotArgs(x,p_around, title="p around", plotType="plot")
-    plot_figs([data1], -1)
+    data1 = makePlotArgs(x, p_around, title="p around", plotType="plot")
+    data2 = makePlotArgs(Z=batchP.squeeze(), title="p", plotType="matshow")
+    plot_figs([data1, data2], -1)
+
 
 if __name__ == "__main__":
-    test2()
+    test1()

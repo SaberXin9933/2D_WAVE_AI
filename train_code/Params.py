@@ -10,7 +10,7 @@ class Params(object):
         self.netName = "Spinn_Wave_Model"
         self.optimizerName = "Adam"
         self.netHiddenSize = 32
-        self.train_env_types = ["super_simple", "oscillator", "simple"]
+        self.env_types = ["simple", "random"]
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
