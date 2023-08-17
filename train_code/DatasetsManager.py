@@ -36,7 +36,7 @@ class DatasetsManager:
 
     def startAll(self):
         threading_list = []
-        for _ in range(2):
+        for _ in range(10):
             t = threading.Thread(target=askThread,args=(self.datasets,self.askQueue,self.context.device))
             threading_list.append(t)
         for _ in range(1):
@@ -67,7 +67,7 @@ def test1():
     params.batch_size = 100
     params.dataset_size = 1000
     context = Context(params)
-    context.device = torch.device("cpu")
+    context.device = torch.device("cuda:0")
     datasetManager = DatasetsManager(context)
     datasetManager.startAll()
     # time.sleep(5)
@@ -80,7 +80,7 @@ def test1():
         t1 = time.time()
         data = datasetManager.ask()
         t2 = time.time()
-        time.sleep(0.05)
+        # time.sleep(0.1)
         t3 = time.time()
         datasetManager.tell(data[:-1])
         t4 = time.time()

@@ -58,13 +58,14 @@ class Params(object):
         """
         训练配置
         """
-        self.n_epochs = 1000
+        self.n_epochs = 100000000
         self.n_batches_per_epoch = 10000
         self.reset_freq = 0.0003
         self.train_save_per_sample_times = 1000
         self.ask_fail_wait_time = 0.01
         self.batch_size = 50
         self.dataset_size: int = 1000
+        self.max_step = 5000
 
         """
         测试配置

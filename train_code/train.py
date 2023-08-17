@@ -15,7 +15,7 @@ def mse(loss):
 
 
 def train():
-    set_num_threads(4)
+    set_num_threads(12)
 
     params = Params()
     params.type = "train"
@@ -39,12 +39,12 @@ def train():
         model.train()
         for i in range(params.n_batches_per_epoch):
             data = dataManager.ask()
-            index_list, p_old, v_old, propagation_p, propagation_v = data
+            index_list, p_old, v_old, propagation = data
             p_new, v_new = model(
-                torch.cat([p_old, v_old, propagation_p, propagation_v], dim=1)
+                torch.cat([p_old, v_old, propagation], dim=1)
             )
             lossBatchP, lossBatchVX, lossBatchVY = finitDiffenceManager.physic_cf_loss(
-                p_old, v_old, p_new, v_new, propagation_p, propagation_v
+                p_old, v_old, p_new, v_new, propagation
             )
             loss_p = mse(lossBatchP)
             loss_vx = mse(lossBatchVX)

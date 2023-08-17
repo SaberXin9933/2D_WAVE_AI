@@ -8,7 +8,7 @@ class Spinn_Wave_Model(nn.Module):
         self.hidden_size = hidden_size
         self.bilinear = bilinear
         self.residuals = residuals
-        self.conv1 = nn.Conv2d(6, hidden_size, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(4, hidden_size, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
         self.conv3 = nn.Conv2d(hidden_size, 3, kernel_size=3, padding=1)
 

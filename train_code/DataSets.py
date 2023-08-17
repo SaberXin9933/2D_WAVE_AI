@@ -13,9 +13,10 @@ import numpy as np
 import time
 from Context import Context
 import os
+from torch.utils.data import Dataset
 
 
-class DataSets:
+class DataSets(Dataset):
     def __init__(self, context: Context) -> None:
         self.context = context
         self.params = params = context.params
@@ -57,6 +58,13 @@ class DataSets:
         domain = self.domainList[index]
         self.domainManager.updateDomain(domain)
         return domain
+    
+    def __getitem__(self, index):
+        domain:Domain = self.askDomainByIndex(index)
+        return domain.index,domain.data_p,domain.data_v,domain.base_propagation
+    
+    def __len__(self):
+        return self.dataset_size
 
     def askDomainListByIndexList(self, indexList: List[int]) -> List[Domain]:
         return [self.askDomainByIndex(index) for index in indexList]
@@ -116,9 +124,11 @@ class DataSets:
             batchV,
         ) = data
         for i, index in enumerate(indexList):
-            if self.params.type == "train" and random.random() < self.params.reset_freq:
-                self.domainList[index] = self.domainManager.getDomain(index)
-                self.log.info(f"reset_{index}")
+            domain = self.domainList[index]
+            if self.params.type == "train":
+                if random.random() < self.params.reset_freq or domain.step < self.params.max_step:
+                    domain = self.domainManager.getDomain(index)
+                    self.log.info(f"reset_{index}")
             else:
                 domain: Domain = self.domainList[index]
                 domain.data_p = batchP[i]
