@@ -23,36 +23,40 @@ class SourceManager:
         self.maxT = params.maxT
         self.minBiasRate = params.minBiasRate
         self.maxBiasRate = params.maxBiasRate
-        self.minSouceWH = params.minSouceWH
-        self.maxSouceWH = params.maxSouceWH
-        self.cellWH = params.cellWH
+        self.minCellWH = 20
+        self.maxCellWH = min(self.propagationWidth,self.propagationHeight)
+        self.minSouceWH = int(0.5*self.minCellWH)
+        self.maxSouceWH = int(0.5*self.maxCellWH)
         self.maxSourceNum = params.maxSourceNum
         self.dtype = params.dtype
 
-        self.initPartition()
-
     """传播域分区"""
 
-    def initPartition(self):
+    def getPartition(self,sourceNum:int):
         # 计算传播域分区信息
         pw = self.propagationWidth
         ph = self.propagationHeight
-        cellWH = self.cellWH
+        minCellWH = self.minCellWH
+        maxCellWH = self.maxCellWH
         boundaryWH = self.boundaryWH
+        cellW = int(pw/(np.ceil(np.sqrt(sourceNum))))
+        cellW = min(max(minCellWH,cellW),maxCellWH)
+        cellH = int(ph/(np.ceil(np.sqrt(sourceNum))))
+        cellH = min(max(minCellWH,cellH),maxCellWH)
 
-        w_partition_times = pw // cellWH
-        h_partition_times = ph // cellWH
+        w_partition_times = pw // cellW
+        h_partition_times = ph // cellH
 
         partition_result = []
         for i in range(w_partition_times):
             for j in range(h_partition_times):
-                x = i * cellWH + boundaryWH
-                y = j * cellWH + boundaryWH
-                w = pw - i * cellWH if i == w_partition_times - 1 else cellWH
-                h = ph - j * cellWH if j == h_partition_times - 1 else cellWH
-                partition_result.append((x, y, w, h))
-        self.maxSourceNum = min(len(partition_result), self.maxSourceNum)
-        self.partition_result = partition_result
+                x = i * cellW + boundaryWH
+                y = j * cellH + boundaryWH
+                cellW = (pw - i * cellW) if i == w_partition_times - 1 else cellW
+                cellH = (ph - j * cellH)if j == h_partition_times - 1 else cellH
+                partition_result.append((x, y, cellW, cellH))
+        maxSourceNum = min(len(partition_result), self.maxSourceNum)
+        return maxSourceNum,partition_result
 
     """获取源项"""
 
@@ -68,25 +72,25 @@ class SourceManager:
 
     def getRandomSourceList(self, sourceNum: int = None) -> List[Source]:
         sourceNum = (
-            sourceNum if sourceNum != None else random.randint(1, self.maxSourceNum)
+            sourceNum if sourceNum != None else random.randint(2, self.maxSourceNum)
         )
-        if self.maxSourceNum < sourceNum:
+        maxSourceNum,partition_result = self.getPartition(sourceNum)
+        if maxSourceNum < sourceNum:
             self.log.error(
                 f"声源点数量超出范围,已经调整为最大声源数量,PRE:{sourceNum},NOW:{self.maxSourceNum}"
             )
             sourceNum = self.maxSourceNum
-
-        partitionList = random.sample(self.partition_result, sourceNum)
+        partitionList = random.sample(partition_result, sourceNum)
         sourceList = []
         for partition in partitionList:
             sourceExpression = self.getRandomSourceExpression()
             cellX, cellY, cellW, cellH = partition
-            sourceX, sourcepY, sourceWH = self.getSourceDistribution(
+            sourceX, sourcepY, sourceW,sourceH = self.getSourceDistribution(
                 cellX, cellY, cellW, cellH
             )
-            mask = torch.ones(1, sourceWH, sourceWH)
+            mask = torch.ones(1, sourceW, sourceH)
             source = Source(
-                sourceX, sourcepY, sourceWH, sourceWH, mask, sourceExpression
+                sourceX, sourcepY, sourceW, sourceH, mask, sourceExpression
             )
             sourceList.append(source)
         return sourceList
@@ -96,12 +100,15 @@ class SourceManager:
     def getSourceDistribution(self, cellX, cellY, cellW, cellH) -> tuple:
         maxSouceWH = self.maxSouceWH
         minSouceWH = self.minSouceWH
-        sourceWH = random.randint(minSouceWH, maxSouceWH)
+        sourceW = int(cellW * (random.random()*0.5))
+        sourceW = max(min(sourceW,maxSouceWH),minSouceWH)
+        sourceH = int(cellH * (random.random()*0.5))
+        sourceH = max(min(sourceH,maxSouceWH),minSouceWH)
 
-        leftTopX = cellX + random.randint(0, cellW - sourceWH)
-        leftTopY = cellY + random.randint(0, cellH - sourceWH)
+        leftTopX = cellX + random.randint(0, cellW - sourceW)
+        leftTopY = cellY + random.randint(0, cellH - sourceH)
 
-        return (leftTopX, leftTopY, sourceWH)
+        return (leftTopX, leftTopY, sourceW,sourceH)
 
     """
     表达式
@@ -154,7 +161,7 @@ def test1():
     params = Params()
     context = Context(params)
     sourceManger = SourceManager(context)
-    sourceList = sourceManger.getRandomSourceList(150)
+    sourceList = sourceManger.getRandomSourceList(4)
     source = sourceList[0]
     print(sourceList)
 

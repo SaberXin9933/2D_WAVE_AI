@@ -24,12 +24,13 @@ class DomainManager:
             self.params.kernel_delta,
             kernel_dtype=self.params.dtype,
         )
+        self.basePML = self.getPMLField()
 
     """获取随机正方形传播域"""
 
-    def getRandomField(self):
+    def getRandomField(self, t=None):
+        t = t if t != None else np.random.rand() * 100000000
         w, h = self.w, self.h
-        t = np.random.rand() * 100000000
         x_mesh, y_mesh = torch.meshgrid(torch.arange(0, w), torch.arange(0, h))
         x_mesh, y_mesh = 1.0 * x_mesh, 1.0 * y_mesh
         data = np.sin(
@@ -41,7 +42,24 @@ class DomainManager:
             + 0.01 * y_mesh * np.cos(t * 0.0215)
         )
         data /= torch.max(data)
-        return data.to(self.dytpe).unsqueeze(0)
+        return data.unsqueeze(0)
+
+    # 获取传播域
+    def getPropagation(self, domain: Domain):
+        propagation = torch.ones(1, self.w, self.h)
+        mean_left = self.derivatives.mean_left
+        mean_top = self.derivatives.mean_top
+
+        for source in domain.sourceList:
+            sx = source.x
+            sy = source.y
+            sw = source.sourceWidth
+            sh = source.sourceHeight
+            mask: torch.Tensor = source.mask
+            propagation[0:1, sx : sx + sw, sy : sy + sh] = (
+                mean_left(mean_top(mask)) < 0
+            ).float()
+        return propagation
 
     """获取计算域"""
 
@@ -52,7 +70,9 @@ class DomainManager:
         else:
             if domainType == None:
                 domainType = random.sample(self.params.env_types, 1)[0]
-            if domainType == "simple":
+            if domainType == "super_simple":
+                return self.getSimpleDomain(index, 1)
+            elif domainType == "simple":
                 return self.getSimpleDomain(index)
             elif domainType == "random":
                 return self.getRandomDomain(index)
@@ -61,38 +81,33 @@ class DomainManager:
 
     def getSimpleDomain(self, index: int, sourceNum: int = None) -> Domain:
         domain = Domain(index)
-        domain.type = "simple"
-        domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
-        domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
-
-        domain.data_p += self.getRandomField() * 0.05
-        domain.data_v[0:1] += self.getRandomField() * 0.05
-        domain.data_v[1:2] += self.getRandomField() * 0.05
-
-        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.type = "super_simple" if sourceNum == 1 else "simple"
+        domain.data_p = torch.zeros(1, self.w, self.h)
+        domain.data_v = torch.zeros(2, self.w, self.h)
         domain.sourceList = self.sourceManager.getRandomSourceList(sourceNum)
+        domain.base_propagation = self.getPropagation(domain) * self.getPMLField()
+        #
+        self.addRandomPV(domain.data_p[:], domain.data_v[:])
         return domain
 
     def getRandomDomain(self, index: int) -> Domain:
         domain = Domain(index)
         domain.type = "random"
-        domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
-        domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
-        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.data_p = torch.zeros(1, self.w, self.h)
+        domain.data_v = torch.zeros(2, self.w, self.h)
+        domain.base_propagation = torch.zeros(1, self.w, self.h)
         domain.sourceList = None
-        domain.propagation_p = domain.base_propagation.clone()
-        domain.propagation_v = torch.cat([domain.base_propagation] * 2, dim=0)
+        #
+        self.addRandomPV(domain.data_p[:], domain.data_v[:],scale=1)
         return domain
 
     def getSpecifiedDomain(self, index: int) -> Domain:
         params = self.params
-        testPointNumber = params.testPointNumber
-        testSourceParamsList = params.testSourceParamsList
-
         domain = Domain(index)
-        domain.data_p = torch.zeros(1, self.w, self.h).to(self.dytpe)
-        domain.data_v = torch.zeros(2, self.w, self.h).to(self.dytpe)
-        domain.base_propagation = self.getPMLField().to(self.dytpe)
+        domain.type = "specified_super_simple"
+        domain.data_p = torch.zeros(1, self.w, self.h)
+        domain.data_v = torch.zeros(2, self.w, self.h)
+        domain.base_propagation = self.getPMLField()
         domain.sourceList = []
         for sourceParams in params.testSourceParamsList:
             testT, testBias, testSourceX, testSourceY, testSourceWH = sourceParams
@@ -105,8 +120,6 @@ class DomainManager:
     """更新计算域"""
 
     def updateDomainP(self, domain: Domain):
-        domain.propagation_p = domain.base_propagation.clone()
-        domain.propagation_v = torch.cat([domain.base_propagation] * 2, dim=0)
         for source in domain.sourceList:
             sx = source.x
             sy = source.y
@@ -116,11 +129,7 @@ class DomainManager:
             # update source
             sourceExpression = source.sourceExpression
             change = sourceExpression[domain.step % len(sourceExpression)]
-            domain.data_p[
-                :,
-                sx : sx + sw,
-                sy : sy + sh,
-            ] += mask * (
+            domain.data_p[:, sx : sx + sw, sy : sy + sh,] += mask * (
                 change
                 - domain.data_p[
                     :,
@@ -129,47 +138,27 @@ class DomainManager:
                 ]
             )
 
-    def updatePropagation(self, domain: Domain):
-        for source in domain.sourceList:
-            sx = source.x
-            sy = source.y
-            sw = source.sourceWidth
-            sh = source.sourceHeight
-            mask: torch.Tensor = source.mask
-            domain.propagation_p[0:1, sx : sx + sw, sy : sy + sh] = (
-                mask != 1.0
-            ).float()
-            domain.propagation_v[0:1, sx : sx + sw, sy : sy + sh] = (
-                self.derivatives.mean_top(mask) != 1.0
-            ).float()
-            domain.propagation_v[1:2, sx : sx + sw, sy : sy + sh] = (
-                self.derivatives.mean_left(mask) != 1.0
-            ).float()
-
     def updateRandomDomain(self, domain: Domain):
         domain.data_p[:] = 0
         domain.data_v[:] = 0
-        domain.data_p += self.getRandomField() * (domain.base_propagation)
-        domain.data_v[0:1] += self.getRandomField() * domain.base_propagation
-        domain.data_v[1:2] += self.getRandomField() * domain.base_propagation
-        domain.propagation_p[:] = (
-            torch.abs(self.getRandomField()) * domain.base_propagation
+        self.addRandomPV(domain.data_p[:], domain.data_v[:], scale=1)
+        domain.base_propagation = (
+            torch.abs(
+                self.getRandomField((domain.step - 100 * np.random.rand()) * (-100))
+            )
+            * self.basePML
         )
-        domain.propagation_v[0:1] = (
-            torch.abs(self.getRandomField()) * domain.base_propagation
-        )
-        domain.propagation_v[1:2] = (
-            torch.abs(self.getRandomField()) * domain.base_propagation
-        )
+        domain.data_p *= domain.base_propagation
+        domain.data_v[0:1] *= domain.base_propagation
+        domain.data_v[1:2] *= domain.base_propagation
 
     def updateDomain(self, domain: Domain):
         domain.step += 1
         # update propagation field
         if domain.type == "random":
             self.updateRandomDomain(domain)
-        else:
+        if domain.type in ["super_simple", "simple","specified_super_simple"]:
             self.updateDomainP(domain)
-            self.updatePropagation(domain)
 
     """获取PML层"""
 
@@ -182,8 +171,8 @@ class DomainManager:
             dims=[0],
         )
         field_line /= torch.max(field_line)
-        xField = torch.ones(1, self.w, self.h).to(self.dytpe)
-        yField = torch.ones(1, self.w, self.h).to(self.dytpe)
+        xField = torch.ones(1, self.w, self.h)
+        yField = torch.ones(1, self.w, self.h)
         xField[:, : self.params.pml_width, :] *= (field_line).unsqueeze(0).unsqueeze(2)
         xField[:, -self.params.pml_width :, :] *= (
             (torch.flip(field_line, dims=[0])).unsqueeze(0).unsqueeze(2)
@@ -194,29 +183,14 @@ class DomainManager:
         )
         return torch.min(xField, yField)
 
-
-def test1():
-    from matplotlib import pyplot as plt
-
-    index: int = 0
-
-    params = Params()
-    params.domainWidth: int = 200
-    params.domainHeight: int = 200
-    params.whRate: float = 0.07
-    params.boundaryRate: float = 0.2
-    params.pointNumber = 200
-    params.minT = 30
-    params.maxT = 200
-    params.minBiasRate = 0.3
-    params.maxBiasRate = 0.7
-    context = Context(params)
-    domainManager = DomainManager(context)
-    domain = domainManager.getDomain(index)
-    domainManager.updateDomain(domain)
-    plt.matshow(domain.propagation_v[0].squeeze().numpy())
-    plt.colorbar()
-    plt.show()
+    def addRandomPV(self, p, v, scale=0.05):
+        t = (np.random.rand() - 0.5) * 10000
+        seed = np.random.rand()
+        if np.random.rand() > 0.5:
+            scale *= -1
+        p[:] += (self.getRandomField(seed + (-2 * t + np.random.rand()) * 100)) * scale
+        v[0:1] += (self.getRandomField(seed + (t + np.random.rand()) * 100)) * scale
+        v[1:2] += (self.getRandomField(seed + (t + np.random.rand()) * (-100))) * scale
 
 
 def test2():
@@ -235,11 +209,28 @@ def test3():
 
     context = Context()
     mananger = DomainManager(context)
-    pmlField = mananger.getPMLField()
-    line = pmlField[:, :, 100].squeeze().numpy()
-    plt.scatter(range(len(line)), line)
+    domain = mananger.getDomain(0, "random")
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
+    # p
+    cax1 = ax1.matshow(domain.data_p.squeeze())
+    ax1.set_title("P")
+    cbar1 = fig.colorbar(cax1, ax=ax1, orientation="vertical")
+    # vx
+    cax2 = ax2.matshow(domain.data_v[0:1].squeeze())
+    ax2.set_title("VX")
+    cbar2 = fig.colorbar(cax2, ax=ax2, orientation="vertical")
+    # vy
+    cax3 = ax3.matshow(domain.data_v[1:2].squeeze())
+    ax3.set_title("VY")
+    cbar3 = fig.colorbar(cax3, ax=ax3, orientation="vertical")
+    # base_propagation
+    cax4 = ax4.matshow(domain.base_propagation.squeeze())
+    ax4.set_title("base_propagation")
+    cbar4 = fig.colorbar(cax4, ax=ax4, orientation="vertical")
+
+    plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    test2()
+    test3()

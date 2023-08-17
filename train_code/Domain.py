@@ -13,5 +13,3 @@ class Domain:
         self.data_p: torch.Tensor = None
         self.data_v: torch.Tensor = None
         self.base_propagation: torch.Tensor = None
-        self.propagation_p: torch.Tensor = None
-        self.propagation_v: torch.Tensor = None

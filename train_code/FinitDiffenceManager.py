@@ -18,7 +18,7 @@ class FinitDiffenceManager:
             device=context.device,
         )
 
-    def cf_step(self, p, v, propagation_p, propagation_v):
+    def cf_step(self, p, v, propagation):
         c, delta_t, delta_x = self.params.c, self.params.delta_t, self.params.delta_x
         dx = self.derivative.dx
         dy = self.derivative.dy
@@ -26,35 +26,35 @@ class FinitDiffenceManager:
         move_right = self.derivative.move_right
 
         v_new = torch.zeros_like(v)
-        v_new[:, 0:1] = propagation_v[:, 0:1] * (
+        v_new[:, 0:1] = propagation * (
             v[:, 0:1, :, :] - (delta_t / delta_x) * dx(move_bottom(p))[:, :, :, :]
         )
-        v_new[:, 1:2] = propagation_v[:, 1:2] * (
+        v_new[:, 1:2] = propagation * (
             v[:, 1:2, :, :] - (delta_t / delta_x) * dy(move_right(p))[:, :, :, :]
         )
-        p_new = propagation_p * (
+        p_new = propagation * (
             p[:, :, :, :]
             - (c**2 * delta_t / delta_x)
             * (dx(v_new[:, 0:1, :, :]) + dy(v_new[:, 1:2, :, :]))
         )
         return (p_new, v_new)
 
-    def physic_cf_loss(self, p_old, v_old, p_new, v_new, propagation_p, propagation_v):
+    def physic_cf_loss(self, p_old, v_old, p_new, v_new, propagation):
         c, delta_t, delta_x = self.params.c, self.params.delta_t, self.params.delta_x
         dx = self.derivative.dx
         dy = self.derivative.dy
         move_bottom = self.derivative.move_bottom
         move_right = self.derivative.move_right
 
-        lossBatchVX = v_new[:, 0:1] - propagation_v[:, 0:1] * (
+        lossBatchVX = v_new[:, 0:1] - propagation * (
             v_old[:, 0:1, :, :]
             - (delta_t / delta_x) * dx(move_bottom(p_old))[:, :, :, :]
         )
-        lossBatchVY = v_new[:, 1:2] - propagation_v[:, 1:2] * (
+        lossBatchVY = v_new[:, 1:2] - propagation * (
             v_old[:, 1:2, :, :]
             - (delta_t / delta_x) * dy(move_right(p_old))[:, :, :, :]
         )
-        lossBatchP = p_new - propagation_p * (
+        lossBatchP = p_new - propagation * (
             p_old[:, :, :, :]
             - (c**2 * delta_t / delta_x)
             * (dx(v_new[:, 0:1, :, :]) + dy(v_new[:, 1:2, :, :]))
@@ -118,10 +118,9 @@ def test1():
     params.datasetNum = 1
     params.dataset_size = 1
     params.is_cuda = False
-    params.datasetNum = 1
     params.type = "test"
-    params.testIsRandom = True
-    params.env_types = ["random"]
+    params.testIsRandom = False
+    params.env_types = ["super_simple"]
     context = Context(params)
 
     finitDiffenceManager = FinitDiffenceManager(context)
@@ -130,14 +129,14 @@ def test1():
 
     for i in range(10000):
         data = dataSets.ask()
-        index_list, batchP, batchV, propagation_p, propagation_v = data
+        index_list, batchP, batchV, propagation = data
         # batchPropagation = torch.ones_like(batchPropagation)
         newP, newV = finitDiffenceManager.cf_step(
-            batchP, batchV, propagation_p, propagation_v
+            batchP, batchV, propagation
         )
         dataSets.tell((index_list, newP, newV))
         loss_p, loss_vx, loss_vy = finitDiffenceManager.physic_cf_loss(
-            batchP, batchV, newP, newV, propagation_p, propagation_v
+            batchP, batchV, newP, newV, propagation
         )
         print(
             i,
@@ -170,11 +169,10 @@ def test2():
     params.minT = 15
     params.maxT = 40
     params.batch_size = 1
-    params.datasetNum = 1
     params.dataset_size = 1
     params.is_cuda = False
-    params.datasetNum = 1
     params.type = "test"
+    params.env_types = ["super_simple"]
     params.testIsRandom = True
     context = Context(params)
 

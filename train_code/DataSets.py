@@ -97,14 +97,14 @@ class DataSets:
         selected_data_index_list = [domain.index for domain in selected_domains]
         selected_data_p = [domain.data_p for domain in selected_domains]
         selected_data_v = [domain.data_v for domain in selected_domains]
-        selected_propagation_p = [domain.propagation_p for domain in selected_domains]
-        selected_propagation_v = [domain.propagation_v for domain in selected_domains]
+        selected_base_propagation = [
+            domain.base_propagation for domain in selected_domains
+        ]
         return (
             selected_data_index_list,
             torch.stack(selected_data_p, dim=0),
             torch.stack(selected_data_v, dim=0),
-            torch.stack(selected_propagation_p, dim=0),
-            torch.stack(selected_propagation_v, dim=0),
+            torch.stack(selected_base_propagation, dim=0),
         )
 
     """批量回写"""
@@ -164,14 +164,14 @@ def test1():
 def train_test():
     context = Context()
     params = context.params
-    params.batch_size = 100
+    params.batch_size = 50
     params.dataset_size = 1000
     datasets = DataSets(context)
 
     t1 = time.time()
     for i in range(100):
         print(i)
-        index_list, batchP, batchV, propagation_p, propagation_v = datasets.ask()
+        index_list, batchP, batchV, propagation = datasets.ask()
         datasets.updateData((index_list, batchP, batchV))
     cost = time.time() - t1
     print(cost / 100)

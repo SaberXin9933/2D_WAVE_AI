@@ -10,7 +10,7 @@ class Params(object):
         self.netName = "Spinn_Wave_Model"
         self.optimizerName = "Adam"
         self.netHiddenSize = 32
-        self.env_types = ["simple", "random"]
+        self.env_types = ["simple", "random", "super_simple"]
         self.lr = 0.0001
         self.lr_grad = 0.001
         self.domainWidth = 200
@@ -31,10 +31,7 @@ class Params(object):
         self.maxT = 100
         self.minBiasRate = 0.3
         self.maxBiasRate = 0.7
-        self.minSouceWH = 4
-        self.maxSouceWH = 10
-        self.cellWH = 20
-        self.maxSourceNum = 5
+        self.maxSourceNum = 4
 
         """
         差分卷积核
@@ -66,9 +63,8 @@ class Params(object):
         self.reset_freq = 0.0003
         self.train_save_per_sample_times = 1000
         self.ask_fail_wait_time = 0.01
-        self.batch_size = 100
-        self.datasetNum = 5
-        self.dataset_size: int = 600
+        self.batch_size = 50
+        self.dataset_size: int = 1000
 
         """
         测试配置

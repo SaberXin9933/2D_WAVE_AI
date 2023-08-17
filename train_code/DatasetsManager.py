@@ -1,7 +1,6 @@
 from DataSets import DataSets
 from Context import Context, Params
 from typing import Dict, List
-from multiprocessing import Queue, Process
 import threading
 import queue
 import torch
@@ -9,125 +8,43 @@ import random
 import time
 
 
-def askThread(datasets: DataSets, ask_queue: queue.Queue):
+def askThread(datasets: DataSets, ask_queue:queue.Queue,device):
     with torch.no_grad():
         while True:
-            ask_queue.put(datasets.ask())
+            data =  datasets.ask()
+            ask_queue.put([di.to(device) if isinstance(di, torch.Tensor) else di for di in data])
 
 
 def tellThread(datasets: DataSets, tell_queue: queue.Queue):
+    device = torch.device("cpu")
     with torch.no_grad():
         while True:
-            datasets.updateData(tell_queue.get())
-
-
-def datasetsProcess(
-    params: Params,
-    ask_queue: Queue,
-    tell_queue: Queue,
-):
-    torch.set_num_threads(2)
-    context = Context(params)
-    datasets = DataSets(context)
-    threading_list = []
-    for _ in range(1):
-        t = threading.Thread(target=askThread, args=(datasets, ask_queue))
-        threading_list.append(t)
-    for _ in range(1):
-        t = threading.Thread(target=tellThread, args=(datasets, tell_queue))
-        threading_list.append(t)
-    for t in threading_list:
-        t.start()
-
+            data = tell_queue.get()
+            datasets.updateData([di.to(device) if isinstance(di, torch.Tensor) else di for di in data])
 
 class DatasetsManager:
     def __init__(self, context: Context) -> None:
         self.context = context
         self.params = context.params
         self.log = context.logger
-        # 多线程交互
-        self.askQueue = queue.Queue()
-        self.tellQueue = queue.Queue()
-        self.indexQueue = queue.Queue()
-        # 多进程
-        self.askProcessQueueList: List[Queue] = []
-        self.tellProcessQueueList: List[Queue] = []
-        self.processList: List[Process] = []
-
-        # init
-        self.initQueueMap()
-        self.initDatasetsProcess()
-
-    def initQueueMap(self):
-        datasetNum = self.params.datasetNum
-        for _ in range(datasetNum):
-            self.askProcessQueueList.append(Queue(1))
-            self.tellProcessQueueList.append(Queue(1))
-
-    def initDatasetsProcess(self):
-        datasetNum = self.params.datasetNum
-        for index in range(datasetNum):
-            ask_queue = self.askProcessQueueList[index]
-            tell_queue = self.tellProcessQueueList[index]
-            ask_process = Process(
-                target=datasetsProcess,
-                args=(
-                    self.params,
-                    ask_queue,
-                    tell_queue,
-                ),
-            )
-            ask_process.daemon = True
-            self.processList.append(ask_process)
+        self.datasets = DataSets(context)
+        # 多线程GPU CPU交互
+        self.askQueue = queue.Queue(10)
+        self.tellQueue = queue.Queue(10)
+        # 多进程读写交互
+        # self.processList
 
     def startAll(self):
-        for p in self.processList:
-            p.start()
         threading_list = []
-        for _ in range(1):
-            t = threading.Thread(target=self.askThreading)
+        for _ in range(2):
+            t = threading.Thread(target=askThread,args=(self.datasets,self.askQueue,self.context.device))
             threading_list.append(t)
         for _ in range(1):
-            t = threading.Thread(target=self.tellThreading)
+            t = threading.Thread(target=tellThread,args=(self.datasets,self.tellQueue))
             threading_list.append(t)
         for t in threading_list:
             t.start()
 
-    def askByIndex(self, index: int):
-        askQueue: Queue = self.askProcessQueueList[index]
-        data = askQueue.get()
-        return data
-
-    def tellByIndex(self, index: int, data: tuple):
-        tellQueue: Queue = self.tellProcessQueueList[index]
-        return tellQueue.put(data)
-
-    def askThreading(self):
-        device = self.context.device
-        while True:
-            for index in range(len(self.askProcessQueueList)):
-                if self.askProcessQueueList[index].qsize() > 0:
-                    currentIndex = index
-                    break
-            else:
-                currentIndex = random.choice(
-                    [i for i in range(len(self.askProcessQueueList))]
-                )
-
-            data = self.askByIndex(currentIndex)
-            self.indexQueue.put(currentIndex)
-            self.askQueue.put(
-                [di.to(device) if isinstance(di, torch.Tensor) else di for di in data]
-            )
-
-    def tellThreading(self):
-        while True:
-            data = self.tellQueue.get()
-            currentIndex = self.indexQueue.get()
-            self.tellByIndex(
-                currentIndex,
-                [di.cpu() if isinstance(di, torch.Tensor) else di for di in data],
-            )
 
     def ask(self):
         return self.askQueue.get()
@@ -143,27 +60,35 @@ TEST代码
 
 def test1():
     from Context import Params
+    from matplotlib import pyplot as plt
     import time
-
+    torch.set_num_threads(8)
     params = Params()
-    params.datasetNum = 5
-    params.dataset_size = 500
+    params.batch_size = 100
+    params.dataset_size = 1000
     context = Context(params)
+    context.device = torch.device("cpu")
     datasetManager = DatasetsManager(context)
     datasetManager.startAll()
-    time.sleep(5)
+    # time.sleep(5)
     start = time.time()
+    tt = time.time()
+    time_list = []
     for i in range(100):
+        time_list.append(time.time()-tt)
+        tt = time.time()
         t1 = time.time()
         data = datasetManager.ask()
         t2 = time.time()
-        # time.sleep(0.1)
+        time.sleep(0.05)
         t3 = time.time()
-        datasetManager.tell(data[:-2])
+        datasetManager.tell(data[:-1])
         t4 = time.time()
 
         print(i, t2 - t1, t4 - t3)
     print(time.time() - start)
+    plt.plot([i for i in range(len(time_list))],time_list)
+    plt.show()
 
 
 if __name__ == "__main__":
