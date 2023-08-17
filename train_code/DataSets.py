@@ -126,7 +126,7 @@ class DataSets(Dataset):
         for i, index in enumerate(indexList):
             domain = self.domainList[index]
             if self.params.type == "train":
-                if random.random() < self.params.reset_freq or domain.step < self.params.max_step:
+                if random.random() < self.params.reset_freq or domain.step > self.params.max_step:
                     domain = self.domainManager.getDomain(index)
                     self.log.info(f"reset_{index}")
             else:
