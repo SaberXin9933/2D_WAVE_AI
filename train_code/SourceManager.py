@@ -4,7 +4,7 @@ from Source import Source
 from Context import Context
 from typing import List
 from utils.mathUtils import sigmodNP
-import random
+import random,math
 
 
 class SourceManager:
@@ -25,8 +25,8 @@ class SourceManager:
         self.maxBiasRate = params.maxBiasRate
         self.minCellWH = 20
         self.maxCellWH = min(self.propagationWidth,self.propagationHeight)
-        self.minSouceWH = int(0.5*self.minCellWH)
-        self.maxSouceWH = int(0.5*self.maxCellWH)
+        self.minSouceWH = min(5,int(0.2*self.minCellWH))
+        self.maxSouceWH = int(self.maxCellWH)
         self.maxSourceNum = params.maxSourceNum
         self.dtype = params.dtype
 
@@ -100,9 +100,10 @@ class SourceManager:
     def getSourceDistribution(self, cellX, cellY, cellW, cellH) -> tuple:
         maxSouceWH = self.maxSouceWH
         minSouceWH = self.minSouceWH
-        sourceW = int(cellW * (random.random()*0.5))
+        object_r = math.sqrt(cellW**2+cellH**2)//3
+        sourceW = int(object_r * (random.random()*0.8+0.2))
         sourceW = max(min(sourceW,maxSouceWH),minSouceWH)
-        sourceH = int(cellH * (random.random()*0.5))
+        sourceH = int(object_r * (random.random()*0.8+0.2))
         sourceH = max(min(sourceH,maxSouceWH),minSouceWH)
 
         leftTopX = cellX + random.randint(0, cellW - sourceW)

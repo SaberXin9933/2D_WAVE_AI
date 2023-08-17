@@ -119,7 +119,7 @@ def test1():
     params.dataset_size = 1
     params.is_cuda = False
     params.type = "test"
-    params.testIsRandom = False
+    params.testIsRandom = True
     params.env_types = ["super_simple"]
     context = Context(params)
 

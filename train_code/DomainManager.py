@@ -85,7 +85,7 @@ class DomainManager:
         domain.data_p = torch.zeros(1, self.w, self.h)
         domain.data_v = torch.zeros(2, self.w, self.h)
         domain.sourceList = self.sourceManager.getRandomSourceList(sourceNum)
-        domain.base_propagation = self.getPropagation(domain) * self.getPMLField()
+        domain.base_propagation = self.getPMLField()
         #
         self.addRandomPV(domain.data_p[:], domain.data_v[:])
         return domain
@@ -98,7 +98,7 @@ class DomainManager:
         domain.base_propagation = torch.zeros(1, self.w, self.h)
         domain.sourceList = None
         #
-        self.addRandomPV(domain.data_p[:], domain.data_v[:],scale=1)
+        self.updateRandomDomain(domain)
         return domain
 
     def getSpecifiedDomain(self, index: int) -> Domain:
@@ -209,7 +209,7 @@ def test3():
 
     context = Context()
     mananger = DomainManager(context)
-    domain = mananger.getDomain(0, "random")
+    domain = mananger.getDomain(0, "simple")
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(nrows=2, ncols=2, figsize=(10, 10))
     # p
     cax1 = ax1.matshow(domain.data_p.squeeze())
