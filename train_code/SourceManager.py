@@ -123,18 +123,18 @@ class SourceManager:
         swy = np.sin(swx * np.pi * 2 / T)
         data = swy
 
-        # decay_line = np.arange(decay_point) * (12 / decay_point)
-        # decay_line = decay_line * (12 / np.max(decay_line))
-        # decay_line = decay_line - np.max(decay_line) / 2
-        # decay_line = sigmodNP(decay_line)
-        # decay_line = np.concatenate(
-        #     (
-        #         decay_line,
-        #         np.ones(pointNumber - 2 * decay_point),
-        #         np.flip(decay_line),
-        #     )
-        # )
-        # return decay_line * data
+        decay_line = np.arange(decay_point) * (12 / decay_point)
+        decay_line = decay_line * (12 / np.max(decay_line))
+        decay_line = decay_line - np.max(decay_line) / 2
+        decay_line = sigmodNP(decay_line)
+        decay_line = np.concatenate(
+            (
+                decay_line,
+                np.ones(pointNumber - 2 * decay_point),
+                np.flip(decay_line),
+            )
+        )
+        return decay_line * data
         return data
 
     def getRandomSourceExpression(

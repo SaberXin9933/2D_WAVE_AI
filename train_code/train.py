@@ -23,7 +23,7 @@ def train():
     params = Params()
     params.type = "train"
     params.is_cuda = True
-    params.name = "RMSE_NO_DECAY"
+    params.name = "RMSE"
 
     context = Context(params)
     log = context.logger
