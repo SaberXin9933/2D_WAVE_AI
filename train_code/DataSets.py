@@ -14,6 +14,7 @@ import time
 from Context import Context
 import os
 from torch.utils.data import Dataset
+from utils.otherUtils import split_list
 
 
 class DataSets(Dataset):
@@ -25,18 +26,32 @@ class DataSets(Dataset):
         self.batch_size = params.batch_size
         self.is_cuda = params.is_cuda
         self.askFailWaitTime = params.ask_fail_wait_time
+        
 
         # 域管理类初始化
         self.domainManager = DomainManager(context)
 
         # 计算域数据初始化
         self.domainList = self.getDomainList(params.dataset_size)
-        self.indexList = [i for i in range(params.dataset_size)]
         self.domainSize = params.dataset_size
         self.readIndex = 0
         self.writeCount = 0
-        self.rLock = TLock()
+        # 索引初始化
+        self.indicesQueue = queue.Queue()
+        self.tell_lock = TLock()
+        self.tell_indices = []
+        self.tell_count = 0
+        self.freshIndicesQueue()
+        
 
+    def freshIndicesQueue(self,indices_list=[]):
+        if indices_list == []:
+            indices_list = [i for i in range(self.dataset_size)]
+        indices_list = split_list(indices_list,self.batch_size)
+        random.shuffle(indices_list)
+        for indices in indices_list:
+            self.indicesQueue.put(indices)
+        
     """获取单个计算域配置"""
 
     def getDomainList(self, domainSize: int) -> List[Domain]:
@@ -72,33 +87,13 @@ class DataSets(Dataset):
     """同步批量读"""
 
     def ask(self):
-        retryCount = 0
-        while True:
-            if retryCount > 1000:
-                self.log.error(f"ask fail,max retry times")
-                os._exit(1)
-            data = self.ansycAsk()
-            if data == ():
-                retryCount += 1
-                time.sleep(self.askFailWaitTime * retryCount)
-            else:
-                return data
+        return self.ansycAsk()
 
     """异步批量读"""
 
     def ansycAsk(self):
-        self.rLock.acquire()
-        if self.readIndex >= self.dataset_size:
-            self.rLock.release()
-            return ()
-        start = self.readIndex
-        end = min(start + self.batch_size, self.dataset_size)
-        self.readIndex = end
-        self.rLock.release()
-
-        selected_domains = [
-            self.domainList[index] for index in self.indexList[start:end]
-        ]
+        indices = self.indicesQueue.get()
+        selected_domains = [self.domainList[index] for index in indices]
         for domain in selected_domains:
             self.domainManager.updateDomain(domain)
 
@@ -134,13 +129,19 @@ class DataSets(Dataset):
                 domain.data_p = batchP[i]
                 domain.data_v = batchV[i]
 
-        self.rLock.acquire()
-        self.writeCount += len(indexList)
-        if self.writeCount == self.dataset_size:
-            self.writeCount = 0
-            self.readIndex = 0
-            random.shuffle(self.indexList)
-        self.rLock.release()
+        self.tell_lock.acquire()
+        self.tell_indices.extend(indexList)
+        rate = len(self.tell_indices)/self.dataset_size
+        count = len(self.tell_indices)//self.batch_size
+        if rate >= self.params.samper_percent and self.params.samper_percent < 1:
+            print("reset")
+            self.freshIndicesQueue(self.tell_indices[:count*self.batch_size])
+            self.tell_indices = self.tell_indices[count*self.batch_size:]
+        if rate == 1.0:
+            self.freshIndicesQueue(self.tell_indices)
+            self.tell_indices = []
+        self.tell_lock.release()
+        
 
 
 """测试函数"""

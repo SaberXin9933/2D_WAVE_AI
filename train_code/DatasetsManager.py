@@ -11,7 +11,7 @@ import time
 def askThread(datasets: DataSets, ask_queue:queue.Queue,device):
     with torch.no_grad():
         while True:
-            data =  datasets.ask()
+            data = datasets.ask()
             ask_queue.put([di.to(device) if isinstance(di, torch.Tensor) else di for di in data])
 
 
@@ -29,17 +29,17 @@ class DatasetsManager:
         self.log = context.logger
         self.datasets = DataSets(context)
         # 多线程GPU CPU交互
-        self.askQueue = queue.Queue(10)
-        self.tellQueue = queue.Queue(10)
+        self.askQueue = queue.Queue(2)
+        self.tellQueue = queue.Queue(2)
         # 多进程读写交互
         # self.processList
 
     def startAll(self):
         threading_list = []
-        for _ in range(10):
+        for _ in range(8):
             t = threading.Thread(target=askThread,args=(self.datasets,self.askQueue,self.context.device))
             threading_list.append(t)
-        for _ in range(1):
+        for _ in range(2):
             t = threading.Thread(target=tellThread,args=(self.datasets,self.tellQueue))
             threading_list.append(t)
         for t in threading_list:
@@ -62,9 +62,9 @@ def test1():
     from Context import Params
     from matplotlib import pyplot as plt
     import time
-    torch.set_num_threads(8)
+    torch.set_num_threads(12)
     params = Params()
-    params.batch_size = 100
+    params.batch_size = 50
     params.dataset_size = 1000
     context = Context(params)
     context.device = torch.device("cuda:0")
@@ -80,7 +80,7 @@ def test1():
         t1 = time.time()
         data = datasetManager.ask()
         t2 = time.time()
-        # time.sleep(0.1)
+        time.sleep(3600/100000)
         t3 = time.time()
         datasetManager.tell(data[:-1])
         t4 = time.time()
