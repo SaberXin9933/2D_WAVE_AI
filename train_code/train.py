@@ -13,6 +13,9 @@ from utils.torchUtils import set_num_threads, resetRandomTorchSeed
 def mse(loss):
     return torch.mean(torch.pow(loss, 2), dim=(1, 2, 3))
 
+def rmse(loss):
+    return torch.mean(torch.sqrt(torch.pow(loss, 2)), dim=(1, 2, 3))
+
 
 def train():
     set_num_threads(12)
@@ -46,9 +49,9 @@ def train():
             lossBatchP, lossBatchVX, lossBatchVY = finitDiffenceManager.physic_cf_loss(
                 p_old, v_old, p_new, v_new, propagation
             )
-            loss_p = mse(lossBatchP)
-            loss_vx = mse(lossBatchVX)
-            loss_vy = mse(lossBatchVY)
+            loss_p = rmse(lossBatchP)
+            loss_vx = rmse(lossBatchVX)
+            loss_vy = rmse(lossBatchVY)
             loss = torch.mean(torch.log10(loss_p + loss_vx + loss_vy))
             optimizer.zero_grad()
             loss.backward()
