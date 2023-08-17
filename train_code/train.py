@@ -14,7 +14,7 @@ def mse(loss):
     return torch.mean(torch.pow(loss, 2), dim=(1, 2, 3))
 
 def rmse(loss):
-    return torch.mean(torch.sqrt(torch.pow(loss, 2)), dim=(1, 2, 3))
+    return torch.sqrt(mse(loss))
 
 
 def train():
@@ -23,7 +23,7 @@ def train():
     params = Params()
     params.type = "train"
     params.is_cuda = True
-    params.name = "simpleTrain"
+    params.name = "RMSE_NO_DECAY"
 
     context = Context(params)
     log = context.logger
